@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - MONGO_URI=mongodb://mongodb:27017
+      - MONGO_DB=weatherpocket
+    depends_on:
+      - mongodb
+
+  frontend:
+    build:
+      context: ./frontend/frontend  # Changed this
+      dockerfile: ../Dockerfile.dev  # Changed this
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/frontend:/app  # Changed this
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+
+volumes:
+  mongo_data:
