@@ -3,6 +3,7 @@ from pydantic import BaseModel, EmailStr, Field
 
 class AuthSignup(BaseModel):
     email: EmailStr
+    fullname: str
     password: str = Field(..., min_length=6, description="Password must be at least 6 characters")
 
 
@@ -14,4 +15,5 @@ class AuthLogin(BaseModel):
 class CurrentUserResponse(BaseModel):
     id: str
     email: str
+    fullname: str
     is_active: bool

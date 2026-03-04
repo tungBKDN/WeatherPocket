@@ -22,9 +22,10 @@ class UserRepository:
         except Exception:
             return None
 
-    async def create(self, email: str, password_hash: str) -> User:
+    async def create(self, email: str, fullname: str, password_hash: str) -> User:
         user_data = {
             "email": email,
+            "fullname": fullname,
             "password_hash": password_hash,
             "is_active": True,
             "created_at": datetime.utcnow(),

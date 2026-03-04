@@ -41,7 +41,7 @@ async def signup(
     service: AuthService = Depends(get_auth_service)
 ) -> TokenResponse:
     """Register a new user."""
-    result = await service.signup(data.email, data.password)
+    result = await service.signup(data.email, data.fullname, data.password)
 
     # Set httpOnly cookie
     response.set_cookie(
@@ -104,6 +104,7 @@ async def get_me(current_user: User = Depends(get_current_user)) -> CurrentUserR
     return CurrentUserResponse(
         id=str(current_user.id),
         email=current_user.email,
+        fullname=current_user.fullname,
         is_active=current_user.is_active
     )
 
@@ -122,6 +123,7 @@ async def refresh_token(
             **{
                 "_id": str(current_user.id),
                 "email": current_user.email,
+                "fullname": current_user.fullname,
                 "is_active": current_user.is_active,
                 "created_at": current_user.created_at,
                 "updated_at": current_user.updated_at

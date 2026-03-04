@@ -16,7 +16,7 @@ class AuthService:
     def __init__(self, user_repository: UserRepository) -> None:
         self.user_repository = user_repository
 
-    async def signup(self, email: str, password: str) -> dict:
+    async def signup(self, email: str, fullname: str, password: str) -> dict:
         existing_user = await self.user_repository.get_by_email(email)
         if existing_user:
             raise HTTPException(
@@ -26,6 +26,7 @@ class AuthService:
 
         user = await self.user_repository.create(
             email=email,
+            fullname=fullname,
             password_hash=hash_password(password),
         )
 
@@ -38,6 +39,7 @@ class AuthService:
                 **{
                     "_id": str(user.id),
                     "email": user.email,
+                    "fullname": user.fullname,
                     "is_active": user.is_active,
                     "created_at": user.created_at,
                     "updated_at": user.updated_at
@@ -69,6 +71,7 @@ class AuthService:
                 **{
                     "_id": str(user.id),
                     "email": user.email,
+                    "fullname": user.fullname,
                     "is_active": user.is_active,
                     "created_at": user.created_at,
                     "updated_at": user.updated_at

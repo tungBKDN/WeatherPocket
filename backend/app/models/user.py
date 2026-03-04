@@ -19,6 +19,7 @@ class PyObjectId(ObjectId):
 class User(BaseModel):
     id: Optional[ObjectId] = Field(default_factory=ObjectId, alias="_id")
     email: EmailStr
+    fullname: str
     password_hash: str
     is_active: bool = True
     created_at: datetime = Field(default_factory=datetime.utcnow)
