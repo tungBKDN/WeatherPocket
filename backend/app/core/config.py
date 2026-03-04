@@ -12,6 +12,7 @@ class Settings(BaseSettings):
 
     MONGO_URI: str = "mongodb://localhost:27017"
     MONGO_DB: str = "weatherpocket"
+    GEMINI_API_KEY: str = "your-gemini-api-key"
     JWT_SECRET: str = "change-me-in-production"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60
@@ -20,3 +21,5 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+settings = get_settings()
