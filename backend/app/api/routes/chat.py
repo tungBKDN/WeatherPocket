@@ -20,7 +20,7 @@ async def send_message(
     service: ChatService = Depends(get_chat_service)
 ):
     try:
-        reply = await service.send_message(conversation_id, str(current_user["_id"]), body.content)
+        reply = await service.send_message(conversation_id, str(current_user.id), body.content)
         return {"reply": reply}
     except ValueError as e:
         if "Access denied" in str(e):
@@ -36,7 +36,7 @@ async def create_conversation(
     service: ChatService = Depends(get_chat_service)
 ):
     try:
-        conversation_id = await service.create_conversation(str(current_user["_id"]), body.content)
+        conversation_id = await service.create_conversation(str(current_user.id), body.content)
         return {"conversation_id": conversation_id}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -48,7 +48,9 @@ async def get_messages(
     service: ChatService = Depends(get_chat_service)
 ):
     try:
-        messages = await service.get_messages(conversation_id, str(current_user["_id"]))
-        return {"messages": messages}
+        messages = await service.get_messages(conversation_id, str(current_user.id))
+        # Serialize to a flat format the frontend understands
+        serialized = [{"type": m.type, "content": m.content} for m in messages]
+        return {"messages": serialized}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

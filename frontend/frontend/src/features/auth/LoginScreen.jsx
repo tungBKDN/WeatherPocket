@@ -4,10 +4,12 @@ export default function LoginScreen({
   authMode,
   email,
   password,
+  fullname,
   error,
   onAuthModeChange,
   onEmailChange,
   onPasswordChange,
+  onFullnameChange,
   onSubmit,
 }) {
   const [scrollY, setScrollY] = useState(0)
@@ -143,6 +145,21 @@ export default function LoginScreen({
                   {authMode === 'signup' ? 'Create Account' : 'Welcome Back'}
                 </h2>
               </div>
+
+              {authMode === 'signup' && (
+                <label className="block">
+                  <span className="mb-2 block text-xs font-black uppercase tracking-[0.2em] text-slate-700">
+                    Full Name
+                  </span>
+                  <input
+                    className="brutal-input"
+                    onChange={(event) => onFullnameChange(event.target.value)}
+                    required
+                    type="text"
+                    value={fullname}
+                  />
+                </label>
+              )}
 
               <label className="block">
                 <span className="mb-2 block text-xs font-black uppercase tracking-[0.2em] text-slate-700">

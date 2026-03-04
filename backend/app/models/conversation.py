@@ -1,6 +1,6 @@
 from datetime import datetime
-from typing import Optional, Callable
-from pydantic import BaseModel, Field, EmailStr
+from typing import Optional
+from pydantic import BaseModel, Field
 from bson import ObjectId
 
 
@@ -17,7 +17,7 @@ class PyObjectId(ObjectId):
 
 class Conversation(BaseModel):
     id: Optional[ObjectId] = Field(default_factory=ObjectId, alias="_id")
-    user_id: ObjectId
+    user_id: str
     title: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

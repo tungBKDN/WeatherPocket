@@ -42,7 +42,7 @@ class ChatService:
     async def create_conversation(self, user_id: str, content: Optional[str] = None) -> str:
         # Automatically naming conversations based on first message or default to "New Conversation"
         name = content[:30] if content else "New Conversation"
-        conv = await self.conversation_repo.create(name, user_id)
+        conv = await self.conversation_repo.create(user_id, name)
         if content:
             await self.send_message(str(conv.id), user_id, content)
         return str(conv.id)

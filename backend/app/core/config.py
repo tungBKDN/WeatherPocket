@@ -17,6 +17,19 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60
 
+    # Aliases for LangChain libraries that expect different key names
+    @property
+    def MONGODB_URI(self) -> str:
+        return self.MONGO_URI
+
+    @property
+    def MONGO_DB_NAME(self) -> str:
+        return self.MONGO_DB
+
+    @property
+    def GOOGLE_API_KEY(self) -> str:
+        return self.GEMINI_API_KEY
+
 
 @lru_cache
 def get_settings() -> Settings:
