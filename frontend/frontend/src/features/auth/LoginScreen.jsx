@@ -146,7 +146,7 @@ export default function LoginScreen({
                 </h2>
               </div>
 
-              {authMode === 'signup' ? (
+              {authMode === 'signup' && (
                 <label className="block">
                   <span className="mb-2 block text-xs font-black uppercase tracking-[0.2em] text-slate-700">
                     Full Name
@@ -154,12 +154,12 @@ export default function LoginScreen({
                   <input
                     className="brutal-input"
                     onChange={(event) => onFullnameChange(event.target.value)}
-                    required={authMode === 'signup'}
+                    required
                     type="text"
                     value={fullname}
                   />
                 </label>
-              ) : null}
+              )}
 
               <label className="block">
                 <span className="mb-2 block text-xs font-black uppercase tracking-[0.2em] text-slate-700">

@@ -56,12 +56,14 @@ export async function signup(email, fullname, password) {
 }
 
 export async function getMe(token) {
+  const headers = token
+    ? { Authorization: `Bearer ${token}` }
+    : {}
+
   const response = await fetch('/auth/me', {
     method: 'GET',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    credentials: 'include',
+    headers,
+    credentials: 'include', // sends httpOnly cookie automatically
   })
 
   if (!response.ok) {

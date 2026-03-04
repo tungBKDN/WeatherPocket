@@ -12,10 +12,18 @@ export default defineConfig({
         target: apiTarget,
         changeOrigin: true,
       },
+      '/conversations': {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+      '/chat': {
+        target: apiTarget,
+        changeOrigin: true,
+      },
       '/api': {
         target: apiTarget,
         changeOrigin: true,
-      }
+      },
     }
   }
 })
