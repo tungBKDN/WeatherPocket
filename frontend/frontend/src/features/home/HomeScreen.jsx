@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
+import Markdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import {
   createConversation,
   deleteConversation,
   getMessages,
   listConversations,
-  sendMessage,
+  streamMessage,
 } from '../../services/chat'
 
 function IconPlus() {
@@ -45,6 +47,39 @@ function IconWeather() {
       <circle cx="12" cy="12" r="4" />
       <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" strokeLinecap="round" />
     </svg>
+  )
+}
+
+function IconRobot() {
+  return (
+    <svg fill="none" height="18" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24" width="18">
+      <rect height="10" rx="2" width="14" x="5" y="9" />
+      <path d="M9 13h.01M15 13h.01" strokeLinecap="round" strokeWidth="2.5" />
+      <path d="M12 9V6M10 6h4" strokeLinecap="round" />
+      <path d="M5 14H3M21 14h-2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function UserAvatar({ initial }) {
+  return (
+    <div
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-4 border-slate-900 bg-blue-400 text-sm font-black uppercase text-slate-900"
+      style={{ boxShadow: '2px 2px 0 rgb(15 23 42)' }}
+    >
+      {initial}
+    </div>
+  )
+}
+
+function BotAvatar() {
+  return (
+    <div
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-4 border-slate-900 bg-yellow-300 text-slate-900"
+      style={{ boxShadow: '2px 2px 0 rgb(15 23 42)' }}
+    >
+      <IconRobot />
+    </div>
   )
 }
 
@@ -141,12 +176,13 @@ function Sidebar({ conversations, activeId, onSelect, onCreate, onDelete, collap
   )
 }
 
-function MessageBubble({ message }) {
+function MessageBubble({ message, userInitial, isStreaming }) {
   const isHuman = message.type === 'human'
   return (
-    <div className={`flex ${isHuman ? 'justify-end' : 'justify-start'}`}>
+    <div className={`flex items-end gap-2 ${isHuman ? 'justify-end' : 'justify-start'}`}>
+      {!isHuman && <BotAvatar />}
       <div
-        className={`max-w-[75%] border-4 border-slate-900 p-3 text-sm font-bold ${
+        className={`max-w-[70%] border-4 border-slate-900 p-3 text-sm font-bold ${
           isHuman ? 'bg-blue-400 text-slate-900' : 'bg-white text-slate-900'
         }`}
         style={{ boxShadow: '4px 4px 0 rgb(15 23 42)' }}
@@ -154,13 +190,48 @@ function MessageBubble({ message }) {
         <p className="mb-1 text-[10px] font-black uppercase tracking-[0.2em] opacity-60">
           {isHuman ? 'You' : 'WeatherPocket AI'}
         </p>
-        <p className="leading-relaxed">{message.content}</p>
+        {isHuman ? (
+          <p className="leading-relaxed whitespace-pre-wrap">{message.content}</p>
+        ) : (
+          <div className="markdown-body leading-relaxed">
+            <Markdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                p:      ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                strong: ({ children }) => <strong className="font-black">{children}</strong>,
+                em:     ({ children }) => <em className="italic">{children}</em>,
+                h1:     ({ children }) => <h1 className="text-lg font-black uppercase mt-2 mb-1">{children}</h1>,
+                h2:     ({ children }) => <h2 className="text-base font-black uppercase mt-2 mb-1">{children}</h2>,
+                h3:     ({ children }) => <h3 className="font-black uppercase mt-1 mb-1">{children}</h3>,
+                ul:     ({ children }) => <ul className="list-disc pl-5 mb-2 space-y-1">{children}</ul>,
+                ol:     ({ children }) => <ol className="list-decimal pl-5 mb-2 space-y-1">{children}</ol>,
+                li:     ({ children }) => <li>{children}</li>,
+                code:   ({ inline, children }) =>
+                  inline
+                    ? <code className="bg-slate-100 border-2 border-slate-300 px-1 font-mono text-xs rounded">{children}</code>
+                    : <pre className="bg-slate-900 text-yellow-300 p-3 my-2 overflow-x-auto font-mono text-xs border-4 border-slate-900" style={{boxShadow:'3px 3px 0 rgb(15 23 42)'}}><code>{children}</code></pre>,
+                blockquote: ({ children }) => <blockquote className="border-l-4 border-slate-400 pl-3 italic opacity-80 my-2">{children}</blockquote>,
+                a:      ({ href, children }) => <a className="underline font-black hover:opacity-70" href={href} target="_blank" rel="noreferrer">{children}</a>,
+                hr:     () => <hr className="border-2 border-slate-900 my-3" />,
+                table:  ({ children }) => <table className="border-collapse w-full text-xs my-2">{children}</table>,
+                th:     ({ children }) => <th className="border-2 border-slate-900 px-2 py-1 bg-slate-100 font-black uppercase">{children}</th>,
+                td:     ({ children }) => <td className="border-2 border-slate-900 px-2 py-1">{children}</td>,
+              }}
+            >
+              {message.content}
+            </Markdown>
+            {isStreaming && (
+              <span className="inline-block w-2 h-4 bg-slate-900 ml-0.5 align-middle animate-pulse" />
+            )}
+          </div>
+        )}
       </div>
+      {isHuman && <UserAvatar initial={userInitial} />}
     </div>
   )
 }
 
-function ChatArea({ conversation, messages, onSend, loadingMessages, sending }) {
+function ChatArea({ conversation, messages, onSend, loadingMessages, sending, user }) {
   const bottomRef = useRef(null)
   const [input, setInput] = useState('')
 
@@ -207,10 +278,16 @@ function ChatArea({ conversation, messages, onSend, loadingMessages, sending }) 
         ) : (
           <div className="space-y-4">
             {messages.map((msg, i) => (
-              <MessageBubble key={i} message={msg} />
+              <MessageBubble
+                key={i}
+                message={msg}
+                userInitial={user?.fullname?.[0] ?? '?'}
+                isStreaming={msg.streaming === true}
+              />
             ))}
-            {sending && (
-              <div className="flex justify-start">
+            {sending && messages[messages.length - 1]?.content === '' && (
+              <div className="flex items-end gap-2 justify-start">
+                <BotAvatar />
                 <div
                   className="border-4 border-slate-900 bg-white px-4 py-3 text-xs font-black uppercase text-slate-400"
                   style={{ boxShadow: '4px 4px 0 rgb(15 23 42)' }}
@@ -247,6 +324,14 @@ function ChatArea({ conversation, messages, onSend, loadingMessages, sending }) 
   )
 }
 
+// Normalize a conversation object so it always has .id regardless of whether
+// the backend returned {id:"..."} or {_id:"..."}
+function normalizeConv(conv) {
+  if (!conv) return conv
+  const id = conv.id ?? conv._id
+  return { ...conv, id: String(id) }
+}
+
 export default function HomeScreen({ user, onLogout }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [conversations, setConversations] = useState([])
@@ -260,7 +345,7 @@ export default function HomeScreen({ user, onLogout }) {
     const load = async () => {
       try {
         const data = await listConversations()
-        setConversations(data.conversations ?? data)
+        setConversations((data.conversations ?? data).map(normalizeConv))
       } catch (err) {
         console.error('Failed to load conversations:', err)
       } finally {
@@ -271,7 +356,7 @@ export default function HomeScreen({ user, onLogout }) {
   }, [])
 
   useEffect(() => {
-    if (!activeConversation) return
+    if (!activeConversation?.id) return
     const load = async () => {
       setLoadingMessages(true)
       setMessages([])
@@ -285,11 +370,11 @@ export default function HomeScreen({ user, onLogout }) {
       }
     }
     load()
-  }, [activeConversation])
+  }, [activeConversation?.id])
 
   const handleCreateConversation = async (title) => {
     try {
-      const conv = await createConversation(title)
+      const conv = normalizeConv(await createConversation(title))
       setConversations((prev) => [conv, ...prev])
       setActiveConversation(conv)
     } catch (err) {
@@ -311,19 +396,47 @@ export default function HomeScreen({ user, onLogout }) {
   }
 
   const handleSend = async (content) => {
+    const convId = activeConversation?.id
+    if (!convId) return
+
+    // 1. Append the human message
     setMessages((prev) => [...prev, { type: 'human', content }])
     setSending(true)
+
+    // 2. Append an empty AI placeholder — it will fill up token by token
+    setMessages((prev) => [...prev, { type: 'ai', content: '', streaming: true }])
+
     try {
-      const data = await sendMessage(activeConversation.id, content)
-      setMessages((prev) => [...prev, { type: 'ai', content: data.reply }])
-      setConversations((prev) => {
-        const hit = prev.find((c) => c.id === activeConversation.id)
-        return hit ? [hit, ...prev.filter((c) => c.id !== activeConversation.id)] : prev
-      })
+      for await (const chunk of streamMessage(convId, content)) {
+        setSending(false)  // first token arrived — hide "thinking" indicator
+        setMessages((prev) => {
+          const msgs = [...prev]
+          const last = msgs[msgs.length - 1]
+          msgs[msgs.length - 1] = { ...last, content: last.content + chunk }
+          return msgs
+        })
+      }
     } catch (err) {
-      setMessages((prev) => [...prev, { type: 'ai', content: `Error: ${err.message}` }])
+      setMessages((prev) => {
+        const msgs = [...prev]
+        msgs[msgs.length - 1] = { type: 'ai', content: `Error: ${err.message}`, streaming: false }
+        return msgs
+      })
     } finally {
+      // Mark streaming done (removes blinking cursor)
+      setMessages((prev) => {
+        const msgs = [...prev]
+        if (msgs.length > 0 && msgs[msgs.length - 1].type === 'ai') {
+          msgs[msgs.length - 1] = { ...msgs[msgs.length - 1], streaming: false }
+        }
+        return msgs
+      })
       setSending(false)
+      // Bump conversation to top of list
+      setConversations((prev) => {
+        const hit = prev.find((c) => c.id === convId)
+        return hit ? [hit, ...prev.filter((c) => c.id !== convId)] : prev
+      })
     }
   }
 
@@ -357,7 +470,7 @@ export default function HomeScreen({ user, onLogout }) {
           loading={loadingConvs}
           onCreate={handleCreateConversation}
           onDelete={handleDeleteConversation}
-          onSelect={setActiveConversation}
+          onSelect={(conv) => setActiveConversation(normalizeConv(conv))}
           onToggle={() => setSidebarCollapsed((v) => !v)}
         />
         <ChatArea
@@ -366,6 +479,7 @@ export default function HomeScreen({ user, onLogout }) {
           messages={messages}
           onSend={handleSend}
           sending={sending}
+          user={user}
         />
       </div>
     </div>
