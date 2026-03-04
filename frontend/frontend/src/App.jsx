@@ -19,6 +19,7 @@ export default function App() {
   const [status, setStatus] = useState('checking')
   const [error, setError] = useState('')
   const [authMode, setAuthMode] = useState('signin')
+  const [user, setUser] = useState(null)
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -85,6 +86,7 @@ export default function App() {
       onEmailChange={setEmail}
       onFullnameChange={setFullname}
       onPasswordChange={setPassword}
+      onFullnameChange={setFullname}
       onSubmit={handleAuthSubmit}
       password={password}
     />
