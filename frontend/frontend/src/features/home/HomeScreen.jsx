@@ -1,4 +1,4 @@
-export default function HomeScreen({ onLogout }) {
+export default function HomeScreen({ user, onLogout }) {
   return (
     <main className="min-h-screen bg-lime-300 p-4 md:p-8">
       <section className="mx-auto grid max-w-6xl gap-4 md:grid-cols-12">
@@ -6,7 +6,10 @@ export default function HomeScreen({ onLogout }) {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.2em]">WeatherPocket</p>
-              <h1 className="mt-2 text-2xl font-black uppercase md:text-4xl">Workspace</h1>
+              <h1 className="mt-2 text-2xl font-black uppercase md:text-4xl">
+                {user?.fullname || 'Workspace'}
+              </h1>
+              <p className="mt-1 text-xs text-slate-400">{user?.email}</p>
             </div>
             <button className="brutal-button bg-red-500 text-black hover:bg-red-400" onClick={onLogout} type="button">
               Logout

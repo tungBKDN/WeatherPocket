@@ -14,9 +14,11 @@ import HomeScreen from './features/home/HomeScreen'
 export default function App() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [fullname, setFullname] = useState('')
   const [status, setStatus] = useState('checking')
   const [error, setError] = useState('')
   const [authMode, setAuthMode] = useState('signin')
+  const [user, setUser] = useState(null)
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -27,7 +29,8 @@ export default function App() {
       }
 
       try {
-        await getMe(token)
+        const userData = await getMe(token)
+        setUser(userData)
         setStatus('authenticated')
       } catch {
         clearToken()
@@ -43,11 +46,17 @@ export default function App() {
     setError('')
 
     try {
-      const action = authMode === 'signup' ? signup : login
-      const data = await action(email, password)
+      let data
+      if (authMode === 'signup') {
+        data = await signup(email, fullname, password)
+      } else {
+        data = await login(email, password)
+      }
       saveToken(data.access_token)
+      setUser(data.user)
       setStatus('authenticated')
       setPassword('')
+      setFullname('')
     } catch (authError) {
       setError(authError.message)
       setStatus('unauthenticated')
@@ -57,6 +66,7 @@ export default function App() {
   const handleLogout = async () => {
     await logout()
     clearToken()
+    setUser(null)
     setStatus('unauthenticated')
   }
 
@@ -65,7 +75,7 @@ export default function App() {
   }
 
   if (status === 'authenticated') {
-    return <HomeScreen onLogout={handleLogout} />
+    return <HomeScreen user={user} onLogout={handleLogout} />
   }
 
   return (
@@ -73,12 +83,14 @@ export default function App() {
       authMode={authMode}
       email={email}
       error={error}
+      fullname={fullname}
       onAuthModeChange={(mode) => {
         setAuthMode(mode)
         setError('')
       }}
       onEmailChange={setEmail}
       onPasswordChange={setPassword}
+      onFullnameChange={setFullname}
       onSubmit={handleAuthSubmit}
       password={password}
     />

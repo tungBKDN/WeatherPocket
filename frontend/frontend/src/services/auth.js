@@ -38,14 +38,14 @@ export async function login(email, password) {
   return response.json()
 }
 
-export async function signup(email, password) {
+export async function signup(email, fullname, password) {
   const response = await fetch('/auth/signup', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     credentials: 'include',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, fullname, password }),
   })
 
   if (!response.ok) {
