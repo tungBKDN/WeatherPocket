@@ -1,35 +1,23 @@
 import json
+from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from app.services.chat_service import ChatService
+
 from app.api.routes.auth import get_current_user
+from app.services.chat_service import ChatService
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
+
 class SendMessageRequest(BaseModel):
     content: str
+    file_ids: Optional[List[str]] = None  # documents to use for RAG
+
 
 def get_chat_service() -> ChatService:
-    """Dependency that returns singleton instance"""
     return ChatService.get_instance()
-
-@router.post("/{conversation_id}/messages")
-async def send_message(
-    conversation_id: str,
-    body: SendMessageRequest,
-    current_user=Depends(get_current_user),
-    service: ChatService = Depends(get_chat_service)
-):
-    try:
-        reply = await service.send_message(conversation_id, str(current_user.id), body.content)
-        return {"reply": reply}
-    except ValueError as e:
-        if "Access denied" in str(e):
-            raise HTTPException(status_code=403, detail=str(e))
-        elif "not found" in str(e):
-            raise HTTPException(status_code=404, detail=str(e))
-        raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/{conversation_id}/messages/stream")
 async def stream_message(
@@ -52,8 +40,9 @@ async def stream_message(
 
     async def event_generator():
         try:
-            async for chunk in service.stream_message(conversation_id, user_id, body.content):
-                # JSON-encode each chunk so newlines inside tokens don't break the SSE framing
+            async for chunk in service.stream_message(
+                conversation_id, user_id, body.content, file_ids=body.file_ids
+            ):
                 yield f"data: {json.dumps(chunk)}\n\n"
         except Exception as e:
             yield f"event: error\ndata: {json.dumps(str(e))}\n\n"
@@ -69,18 +58,6 @@ async def stream_message(
         },
     )
 
-@router.get("/{conversation_id}/messages")
-async def get_messages(
-    conversation_id: str,
-    current_user=Depends(get_current_user),
-    service: ChatService = Depends(get_chat_service)
-):
-    try:
-        messages = await service.get_messages(conversation_id, str(current_user.id))
-        serialized = [{"type": m.type, "content": m.content} for m in messages]
-        return {"messages": serialized}
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
 
 @router.post("/{conversation_id}/messages")
 async def send_message(
@@ -90,7 +67,9 @@ async def send_message(
     service: ChatService = Depends(get_chat_service)
 ):
     try:
-        reply = await service.send_message(conversation_id, str(current_user.id), body.content)
+        reply = await service.send_message(
+            conversation_id, str(current_user.id), body.content, file_ids=body.file_ids
+        )
         return {"reply": reply}
     except ValueError as e:
         if "Access denied" in str(e):
@@ -124,3 +103,4 @@ async def get_messages(
         return {"messages": serialized}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+

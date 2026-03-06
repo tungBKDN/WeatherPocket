@@ -1,23 +1,28 @@
-from typing import Optional
+from typing import List, Optional
 from langchain_core.runnables.history import RunnableWithMessageHistory
-from langchain_core.messages import trim_messages
-from app.core.langchain_config import base_chain, model
+from app.core.langchain_config import base_chain
 from app.core.langchain_history import get_session_history
 from app.repositories.conversation_repository import ConversationRepository
+from app.services.rag_service import RagService
+
+
+def _build_rag_input(content: str, contexts: List[str]) -> str:
+    """Prepend retrieved context snippets to the user message."""
+    joined = "\n\n---\n\n".join(contexts)
+    return (
+        f"Use the following document excerpts to help answer the question.\n\n"
+        f"{joined}\n\n"
+        f"---\n\nQuestion: {content}"
+    )
+
 
 class ChatService:
     _instance: Optional['ChatService'] = None
 
     def __init__(self):
         self.conversation_repo = ConversationRepository()
+        self.rag = RagService.get_instance()
         self.chain = RunnableWithMessageHistory(
-            # trim_messages(
-            #     base_chain,
-            #     max_tokens=4000,
-            #     strategy="last",
-            #     token_counter=model,
-            #     include_system=True
-            # ),
             base_chain,
             get_session_history,
             input_messages_key="input",
@@ -31,7 +36,20 @@ class ChatService:
             cls._instance = cls()
         return cls._instance
 
-    async def send_message(self, conversation_id: str, user_id: str, content: str) -> str:
+    def _resolve_input(self, content: str, file_ids: Optional[List[str]]) -> str:
+        """If file_ids provided, enrich the user message with retrieved context."""
+        if not file_ids:
+            return content
+        contexts = self.rag.retrieving(query=content, file_ids=file_ids)
+        return _build_rag_input(content, contexts) if contexts else content
+
+    async def send_message(
+        self,
+        conversation_id: str,
+        user_id: str,
+        content: str,
+        file_ids: Optional[List[str]] = None,
+    ) -> str:
         conv = await self.conversation_repo.get_by_id_and_user(conversation_id, user_id)
         if not conv:
             exists = await self.conversation_repo.get_by_id(conversation_id)
@@ -39,15 +57,23 @@ class ChatService:
                 raise ValueError("Access denied")
             raise ValueError("Conversation not found")
 
+        enriched = self._resolve_input(content, file_ids)
+
         result = await self.chain.ainvoke(
-            {"input": content},
+            {"input": enriched},
             config={"configurable": {"session_id": conversation_id}},
         )
 
         await self.conversation_repo.touch(conversation_id)
         return result.content if hasattr(result, "content") else str(result)
 
-    async def stream_message(self, conversation_id: str, user_id: str, content: str):
+    async def stream_message(
+        self,
+        conversation_id: str,
+        user_id: str,
+        content: str,
+        file_ids: Optional[List[str]] = None,
+    ):
         """Async generator that yields string chunks as the model streams its response."""
         conv = await self.conversation_repo.get_by_id_and_user(conversation_id, user_id)
         if not conv:
@@ -56,8 +82,10 @@ class ChatService:
                 raise ValueError("Access denied")
             raise ValueError("Conversation not found")
 
+        enriched = self._resolve_input(content, file_ids)
+
         async for chunk in self.chain.astream(
-            {"input": content},
+            {"input": enriched},
             config={"configurable": {"session_id": conversation_id}},
         ):
             yield chunk
@@ -65,7 +93,6 @@ class ChatService:
         await self.conversation_repo.touch(conversation_id)
 
     async def create_conversation(self, user_id: str, content: Optional[str] = None) -> str:
-        # Automatically naming conversations based on first message or default to "New Conversation"
         name = content[:30] if content else "New Conversation"
         conv = await self.conversation_repo.create(user_id, name)
         if content:
@@ -76,6 +103,5 @@ class ChatService:
         conv = await self.conversation_repo.get_by_id_and_user(conversation_id, user_id)
         if not conv:
             raise ValueError("Conversation not found")
-
         history = get_session_history(conversation_id)
         return history.messages

@@ -1,12 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
   createConversation,
   deleteConversation,
+  deleteFile,
   getMessages,
   listConversations,
+  listFiles,
   streamMessage,
+  uploadFileWithProgress,
 } from '../../services/chat'
 
 function IconPlus() {
@@ -37,6 +40,43 @@ function IconMenu() {
   return (
     <svg fill="none" height="20" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24" width="20">
       <path d="M3 6h18M3 12h18M3 18h18" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function IconFile() {
+  return (
+    <svg fill="none" height="16" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="16">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points="14 2 14 8 20 8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function IconPdf() {
+  return (
+    <svg fill="none" height="16" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="16">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points="14 2 14 8 20 8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8 14h8M8 18h6" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function IconUpload() {
+  return (
+    <svg fill="none" height="16" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" width="16">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points="17 8 12 3 7 8" strokeLinecap="round" strokeLinejoin="round" />
+      <line strokeLinecap="round" x1="12" x2="12" y1="3" y2="15" />
+    </svg>
+  )
+}
+
+function IconCheck() {
+  return (
+    <svg fill="none" height="14" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24" width="14">
+      <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
@@ -231,7 +271,17 @@ function MessageBubble({ message, userInitial, isStreaming }) {
   )
 }
 
-function ChatArea({ conversation, messages, onSend, loadingMessages, sending, user }) {
+function ChatArea({
+  conversation,
+  messages,
+  onSend,
+  loadingMessages,
+  sending,
+  user,
+  activeFileIds,
+  fileMap,
+  onRemoveActiveFile,
+}) {
   const bottomRef = useRef(null)
   const [input, setInput] = useState('')
 
@@ -244,7 +294,7 @@ function ChatArea({ conversation, messages, onSend, loadingMessages, sending, us
     if (!input.trim() || sending) return
     const text = input.trim()
     setInput('')
-    await onSend(text)
+    await onSend(text, activeFileIds)
   }
 
   if (!conversation) {
@@ -302,6 +352,23 @@ function ChatArea({ conversation, messages, onSend, loadingMessages, sending, us
       </div>
 
       <form className="border-t-4 border-slate-900 bg-white p-4" onSubmit={handleSubmit}>
+        {activeFileIds?.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-1">
+            <span className="mr-1 self-center text-[10px] font-black uppercase text-slate-500">RAG:</span>
+            {activeFileIds.map((id) => (
+              <button
+                className="flex items-center gap-1 border-2 border-blue-600 bg-blue-100 px-2 py-0.5 text-[10px] font-black uppercase text-blue-800 hover:bg-blue-200"
+                key={id}
+                onClick={() => onRemoveActiveFile?.(id)}
+                title="Remove file from RAG"
+                type="button"
+              >
+                <IconPdf />
+                <span className="max-w-28 truncate">{fileMap?.[id]?.file_name ?? id.slice(-6)}</span>
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex gap-3">
           <input
             className="brutal-input flex-1"
@@ -332,6 +399,214 @@ function normalizeConv(conv) {
   return { ...conv, id: String(id) }
 }
 
+function DocumentsPanel({ conversationId, activeFileIds, onToggleFile, onFilesChange }) {
+  const [files, setFiles] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
+  const [uploadStatus, setUploadStatus] = useState(null)
+  const fileInputRef = useRef(null)
+
+  useEffect(() => {
+    if (!conversationId) {
+      setFiles([])
+      onFilesChange?.([])
+      return
+    }
+    setLoading(true)
+    listFiles(conversationId)
+      .then((loadedFiles) => {
+        setFiles(loadedFiles)
+        onFilesChange?.(loadedFiles)
+      })
+      .catch(() => {
+        setFiles([])
+        onFilesChange?.([])
+      })
+      .finally(() => setLoading(false))
+  }, [conversationId])
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setError('')
+    setUploading(true)
+    setUploadStatus(null)
+    try {
+      const result = await uploadFileWithProgress(conversationId, file, (event) => {
+        setUploadStatus(event)
+      })
+      const newFiles = [result]
+      setFiles((prev) => {
+        const updated = [result, ...prev]
+        onFilesChange?.(updated)
+        return updated
+      })
+      setUploadStatus(null)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  const handleDelete = async (fileId) => {
+    try {
+      await deleteFile(conversationId, fileId)
+      setFiles((prev) => {
+        const updated = prev.filter((f) => f.file_id !== fileId)
+        onFilesChange?.(updated)
+        return updated
+      })
+      // Also remove from active if it was selected
+      if (activeFileIds.includes(fileId)) onToggleFile(fileId)
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  if (!conversationId) return null
+
+  return (
+    <aside
+      className="flex w-72 shrink-0 flex-col border-l-4 border-slate-900 bg-lime-300"
+    >
+      {/* Header */}
+      <div className="flex h-14 shrink-0 items-center justify-between border-b-4 border-slate-900 px-3">
+        <span className="text-xs font-black uppercase tracking-[0.2em]">Documents</span>
+        <button
+          className="flex h-8 w-8 items-center justify-center border-4 border-slate-900 bg-white hover:bg-lime-200 disabled:opacity-50"
+          disabled={uploading}
+          onClick={() => fileInputRef.current?.click()}
+          style={{ boxShadow: '2px 2px 0 rgb(15 23 42)' }}
+          title="Upload PDF"
+          type="button"
+        >
+          {uploading ? (
+            <span className="text-[10px] font-black">…</span>
+          ) : (
+            <IconUpload />
+          )}
+        </button>
+        <input
+          accept=".pdf"
+          className="hidden"
+          onChange={handleUpload}
+          ref={fileInputRef}
+          type="file"
+        />
+      </div>
+
+      {/* Upload progress indicator */}
+      {uploadStatus && (
+        <div className="border-b-2 border-blue-600 bg-blue-100 px-3 py-2">
+          <div className="mb-1 text-[9px] font-black uppercase text-blue-800">
+            {uploadStatus.message}
+          </div>
+          <div className="h-2 w-full overflow-hidden border-2 border-blue-600 bg-white">
+            <div
+              className="h-full bg-blue-600 transition-all duration-300"
+              style={{ width: `${uploadStatus.progress}%` }}
+            />
+          </div>
+          {uploadStatus.meta && (
+            <div className="mt-1 text-[8px] font-bold text-blue-700">
+              {uploadStatus.meta.completed && uploadStatus.meta.total
+                ? `${uploadStatus.meta.completed}/${uploadStatus.meta.total}`
+                : `${uploadStatus.progress}% complete`}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Search box */}
+      <div className="border-b-2 border-slate-900 px-3 py-2">
+        <input
+          className="w-full border-2 border-slate-900 bg-white px-2 py-1 text-[10px] font-bold placeholder-slate-400 focus:outline-none"
+          onChange={(e) => setSearch(e.target.value.toLowerCase())}
+          placeholder="Search PDFs..."
+          style={{ boxShadow: '1px 1px 0 rgb(15 23 42)' }}
+          type="text"
+          value={search}
+        />
+      </div>
+
+      {/* File list */}
+      <div className="flex-1 overflow-y-auto">
+        {error && (
+          <p className="border-b-2 border-red-400 bg-red-100 px-3 py-2 text-[10px] font-black uppercase text-red-700">
+            {error}
+          </p>
+        )}
+        {loading ? (
+          <p className="p-4 text-[10px] font-black uppercase text-slate-500">Loading...</p>
+        ) : files.length === 0 ? (
+          <p className="p-4 text-[10px] font-black uppercase text-slate-500">
+            No PDFs yet. Upload one to enable RAG.
+          </p>
+        ) : (
+          files.filter(f => f.file_name.toLowerCase().includes(search)).map((f) => {
+            const active = activeFileIds.includes(f.file_id)
+            return (
+              <div
+                className={`group flex items-center gap-2 border-b-2 border-slate-900 px-3 py-3 ${
+                  active ? 'bg-blue-400' : 'hover:bg-lime-200'
+                }`}
+                key={f.file_id}
+              >
+                {/* PDF icon */}
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center">
+                  <IconPdf />
+                </div>
+
+                {/* Toggle button */}
+                <button
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center border-4 border-slate-900 ${
+                    active ? 'bg-slate-900 text-white' : 'bg-white hover:bg-blue-200'
+                  }`}
+                  onClick={() => onToggleFile(f.file_id)}
+                  style={{ boxShadow: '2px 2px 0 rgb(15 23 42)' }}
+                  title={active ? 'Remove from RAG' : 'Add to RAG'}
+                  type="button"
+                >
+                  {active ? <IconCheck /> : <IconPlus />}
+                </button>
+
+                {/* File info */}
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-[11px] font-black uppercase">{f.file_name}</span>
+                  <span className="text-[9px] font-bold text-slate-600">{f.chunks} chunks</span>
+                </div>
+
+                {/* Delete */}
+                <button
+                  className="shrink-0 opacity-0 hover:text-red-600 group-hover:opacity-100"
+                  onClick={() => handleDelete(f.file_id)}
+                  title="Delete file"
+                  type="button"
+                >
+                  <IconTrash />
+                </button>
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      {/* Active count badge at bottom */}
+      {activeFileIds.length > 0 && (
+        <div className="border-t-4 border-slate-900 bg-blue-400 px-3 py-2">
+          <p className="text-[10px] font-black uppercase">
+            {activeFileIds.length} file{activeFileIds.length > 1 ? 's' : ''} active for RAG
+          </p>
+        </div>
+      )}
+    </aside>
+  )
+}
+
 export default function HomeScreen({ user, onLogout }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [conversations, setConversations] = useState([])
@@ -340,6 +615,8 @@ export default function HomeScreen({ user, onLogout }) {
   const [loadingConvs, setLoadingConvs] = useState(true)
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [sending, setSending] = useState(false)
+  const [activeFileIds, setActiveFileIds] = useState([])
+  const [filesMap, setFilesMap] = useState({})
 
   useEffect(() => {
     const load = async () => {
@@ -389,13 +666,14 @@ export default function HomeScreen({ user, onLogout }) {
       if (activeConversation?.id === id) {
         setActiveConversation(null)
         setMessages([])
+        setActiveFileIds([])
       }
     } catch (err) {
       console.error('Failed to delete conversation:', err)
     }
   }
 
-  const handleSend = async (content) => {
+  const handleSend = async (content, fileIds = []) => {
     const convId = activeConversation?.id
     if (!convId) return
 
@@ -407,7 +685,7 @@ export default function HomeScreen({ user, onLogout }) {
     setMessages((prev) => [...prev, { type: 'ai', content: '', streaming: true }])
 
     try {
-      for await (const chunk of streamMessage(convId, content)) {
+      for await (const chunk of streamMessage(convId, content, fileIds)) {
         setSending(false)  // first token arrived — hide "thinking" indicator
         setMessages((prev) => {
           const msgs = [...prev]
@@ -440,6 +718,14 @@ export default function HomeScreen({ user, onLogout }) {
     }
   }
 
+  const handleFilesChange = useCallback((files) => {
+    const map = {}
+    files.forEach((f) => {
+      map[f.file_id] = f
+    })
+    setFilesMap(map)
+  }, [])
+
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       <header className="flex shrink-0 items-center justify-between border-b-4 border-slate-900 bg-black px-6 py-4 text-white">
@@ -470,16 +756,31 @@ export default function HomeScreen({ user, onLogout }) {
           loading={loadingConvs}
           onCreate={handleCreateConversation}
           onDelete={handleDeleteConversation}
-          onSelect={(conv) => setActiveConversation(normalizeConv(conv))}
+          onSelect={(conv) => { setActiveConversation(normalizeConv(conv)); setActiveFileIds([]) }}
           onToggle={() => setSidebarCollapsed((v) => !v)}
         />
         <ChatArea
           conversation={activeConversation}
+          fileMap={filesMap}
           loadingMessages={loadingMessages}
           messages={messages}
+          onRemoveActiveFile={(id) =>
+            setActiveFileIds((prev) => prev.filter((x) => x !== id))
+          }
           onSend={handleSend}
           sending={sending}
           user={user}
+          activeFileIds={activeFileIds}
+        />
+        <DocumentsPanel
+          conversationId={activeConversation?.id}
+          activeFileIds={activeFileIds}
+          onToggleFile={(id) =>
+            setActiveFileIds((prev) =>
+              prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+            )
+          }
+          onFilesChange={handleFilesChange}
         />
       </div>
     </div>

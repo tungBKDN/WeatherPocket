@@ -12,6 +12,12 @@ motor>=3.6.0
 pymongo>=4.9.0
 pymongo-search-utils==0.3.0
 
+qdrant-client>=1.0.0
+langchain-qdrant>=0.1.0
+
+# HuggingFace embeddings
+sentence-transformers>=3.0.0
+
 # --- Security & Auth ---
 python-jose[cryptography]==3.3.0
 bcrypt==4.0.1
@@ -24,10 +30,15 @@ langchain>=0.3.0
 langchain-core>=0.3.0
 langchain-mongodb>=0.2.0
 langchain-google-genai>=2.0.0
+langchain-huggingface>=0.1.0
+langchain-text-splitters==1.1.1
+sentence-transformers>=3.0.0
 google-genai>=1.65.0
 google-generativeai>=0.8.3
+tiktoken>=0.5.0
 
 # --- Utilities ---
 python-dotenv==1.0.0
 requests-toolbelt==1.0.0
 tenacity==9.1.4
+PyPDF2==3.0.1

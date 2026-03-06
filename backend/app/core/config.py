@@ -10,6 +10,10 @@ class Settings(BaseSettings):
         extra="ignore",  # Ignore extra fields from .env
     )
 
+    QDRANT_ENDPOINT: str = ""
+    QDRANT_API_KEY: str = ""
+    QDRANT_COLLECTION: str = "weather_docs"
+
     MONGO_URI: str = "mongodb://localhost:27017"
     MONGO_DB: str = "weatherpocket"
     GEMINI_API_KEY: str = "your-gemini-api-key"

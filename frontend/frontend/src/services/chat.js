@@ -81,12 +81,12 @@ export async function sendMessage(conversationId, content) {
  *     that starts with "data: " we JSON-parse the payload and yield it to the caller.
  *  4. When we see the sentinel  data: [DONE]  we stop.
  */
-export async function* streamMessage(conversationId, content) {
+export async function* streamMessage(conversationId, content, fileIds = []) {
   const res = await fetch(`/chat/${conversationId}/messages/stream`, {
     method: 'POST',
     headers: authHeaders(),
     credentials: 'include',
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, file_ids: fileIds.length ? fileIds : undefined }),
   })
   if (!res.ok) throw new Error(await parseError(res, 'Failed to stream message'))
 
@@ -120,4 +120,103 @@ export async function* streamMessage(conversationId, content) {
       }
     }
   }
+}
+
+// ─── Documents (RAG files) ───────────────────────────────────────────────────
+
+export async function listFiles(conversationId) {
+  const res = await fetch(`/chat/${conversationId}/files`, {
+    headers: authHeaders(),
+    credentials: 'include',
+  })
+  if (!res.ok) throw new Error(await parseError(res, 'Failed to load files'))
+  return res.json()
+}
+
+export async function uploadFile(conversationId, file) {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await fetch(`/chat/${conversationId}/files`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getSavedToken()}` },
+    credentials: 'include',
+    body: form,
+  })
+  if (!res.ok) throw new Error(await parseError(res, 'Failed to upload file'))
+  return res.json()
+}
+
+export function uploadFileWithProgress(conversationId, file, onEvent) {
+  return new Promise((resolve, reject) => {
+    const form = new FormData()
+    form.append('file', file)
+
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `/chat/${conversationId}/files/stream`, true)
+    xhr.setRequestHeader('Authorization', `Bearer ${getSavedToken()}`)
+
+    let lastIndex = 0
+    let streamBuffer = ''
+
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable) return
+      const progress = Math.round((event.loaded / event.total) * 100)
+      onEvent?.({
+        type: 'progress',
+        stage: 'upload',
+        progress,
+        message: `Uploading file (${event.loaded}/${event.total} bytes)`,
+      })
+    }
+
+    xhr.onprogress = () => {
+      streamBuffer += xhr.responseText.slice(lastIndex)
+      lastIndex = xhr.responseText.length
+
+      const lines = streamBuffer.split('\n')
+      streamBuffer = lines.pop() ?? ''
+
+      for (const rawLine of lines) {
+        const line = rawLine.trim()
+        if (!line) continue
+
+        try {
+          const payload = JSON.parse(line)
+          onEvent?.(payload)
+          if (payload.type === 'done') {
+            resolve(payload.result)
+          } else if (payload.type === 'error') {
+            reject(new Error(payload.message || 'Failed to upload file'))
+          }
+        } catch {
+          // ignore malformed partial chunk
+        }
+      }
+    }
+
+    xhr.onerror = () => reject(new Error('Network error while uploading file'))
+
+    xhr.onload = () => {
+      if (xhr.status < 200 || xhr.status >= 300) {
+        try {
+          const data = JSON.parse(xhr.responseText)
+          reject(new Error(data?.detail || 'Failed to upload file'))
+        } catch {
+          reject(new Error('Failed to upload file'))
+        }
+      }
+    }
+
+    xhr.send(form)
+  })
+}
+
+export async function deleteFile(conversationId, fileId) {
+  const res = await fetch(`/chat/${conversationId}/files/${fileId}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+    credentials: 'include',
+  })
+  if (!res.ok) throw new Error(await parseError(res, 'Failed to delete file'))
+  return res.json()
 }
