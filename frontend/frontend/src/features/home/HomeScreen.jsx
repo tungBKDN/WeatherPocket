@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
@@ -11,6 +11,8 @@ import {
   streamMessage,
   uploadFileWithProgress,
 } from '../../services/chat'
+import { useSmoothProgress } from '../../hooks/useSmoothProgress'
+import { CONFIG } from '../../config'
 
 function IconPlus() {
   return (
@@ -141,13 +143,13 @@ function Sidebar({ conversations, activeId, onSelect, onCreate, onDelete, collap
 
   return (
     <aside
-      className="relative flex shrink-0 flex-col border-r-4 border-slate-900 bg-yellow-300 transition-[width] duration-200"
+      className="relative flex h-full shrink-0 flex-col border-4 border-slate-900 bg-amber-300 text-slate-900 shadow-[4px_4px_0_rgb(15_23_42)] transition-[width] duration-200 dark:border-slate-300 dark:bg-amber-500 dark:text-slate-950 dark:shadow-[4px_4px_0_rgb(15_23_42)]"
       style={{ width: collapsed ? '52px' : '300px' }}
     >
       {/* Header row — always visible */}
-      <div className="flex h-14 shrink-0 items-center border-b-4 border-slate-900 px-2">
+      <div className="flex h-14 shrink-0 items-center border-b-4 border-slate-900 px-2 dark:border-slate-300">
         <button
-          className="flex h-9 w-9 shrink-0 items-center justify-center border-4 border-slate-900 bg-white hover:bg-yellow-200"
+          className="flex h-9 w-9 shrink-0 items-center justify-center border-4 border-slate-900 bg-white hover:bg-amber-100 dark:border-slate-300 dark:bg-slate-100 dark:hover:bg-white"
           onClick={onToggle}
           style={{ boxShadow: '2px 2px 0 rgb(15 23 42)' }}
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -165,7 +167,7 @@ function Sidebar({ conversations, activeId, onSelect, onCreate, onDelete, collap
       {/* Expanded content */}
       {!collapsed && (
         <>
-          <form className="border-b-4 border-slate-900 p-3" onSubmit={handleCreate}>
+          <form className="border-b-4 border-slate-900 p-3 dark:border-slate-300" onSubmit={handleCreate}>
             <input
               className="brutal-input mb-2 w-full text-sm"
               disabled={creating}
@@ -185,14 +187,14 @@ function Sidebar({ conversations, activeId, onSelect, onCreate, onDelete, collap
 
           <nav className="flex-1 overflow-y-auto">
             {loading ? (
-              <p className="p-4 text-xs font-bold uppercase text-slate-500">Loading...</p>
+              <p className="p-4 text-xs font-bold uppercase text-slate-600 dark:text-slate-800">Loading...</p>
             ) : conversations.length === 0 ? (
-              <p className="p-4 text-xs font-bold uppercase text-slate-500">No conversations yet.</p>
+              <p className="p-4 text-xs font-bold uppercase text-slate-600 dark:text-slate-800">No conversations yet.</p>
             ) : (
               conversations.map((conv) => (
                 <div
-                  className={`group flex cursor-pointer items-center justify-between border-b-2 border-slate-900 px-3 py-3 ${
-                    activeId === conv.id ? 'bg-blue-400' : 'hover:bg-yellow-200'
+                  className={`group flex cursor-pointer items-center justify-between border-b-2 border-slate-900 px-3 py-3 dark:border-slate-300 ${
+                    activeId === conv.id ? 'bg-blue-500 text-white' : 'hover:bg-amber-200 dark:hover:bg-amber-400/80'
                   }`}
                   key={conv.id}
                   onClick={() => onSelect(conv)}
@@ -222,12 +224,14 @@ function MessageBubble({ message, userInitial, isStreaming }) {
     <div className={`flex items-end gap-2 ${isHuman ? 'justify-end' : 'justify-start'}`}>
       {!isHuman && <BotAvatar />}
       <div
-        className={`max-w-[70%] border-4 border-slate-900 p-3 text-sm font-bold ${
-          isHuman ? 'bg-blue-400 text-slate-900' : 'bg-white text-slate-900'
+        className={`max-w-[78%] border-4 border-slate-900 p-3 text-sm leading-relaxed ${
+          isHuman
+            ? 'bg-blue-500 text-white dark:border-blue-200 dark:bg-blue-700 dark:text-blue-50'
+            : 'bg-white text-slate-900 dark:border-slate-300 dark:bg-slate-800 dark:text-slate-100'
         }`}
         style={{ boxShadow: '4px 4px 0 rgb(15 23 42)' }}
       >
-        <p className="mb-1 text-[10px] font-black uppercase tracking-[0.2em] opacity-60">
+        <p className="mb-1 text-[10px] font-black uppercase tracking-[0.2em] opacity-70">
           {isHuman ? 'You' : 'WeatherPocket AI'}
         </p>
         {isHuman ? (
@@ -248,20 +252,20 @@ function MessageBubble({ message, userInitial, isStreaming }) {
                 li:     ({ children }) => <li>{children}</li>,
                 code:   ({ inline, children }) =>
                   inline
-                    ? <code className="bg-slate-100 border-2 border-slate-300 px-1 font-mono text-xs rounded">{children}</code>
-                    : <pre className="bg-slate-900 text-yellow-300 p-3 my-2 overflow-x-auto font-mono text-xs border-4 border-slate-900" style={{boxShadow:'3px 3px 0 rgb(15 23 42)'}}><code>{children}</code></pre>,
+                    ? <code className="rounded border-2 border-slate-300 bg-slate-100 px-1 font-mono text-xs dark:border-slate-500 dark:bg-slate-700">{children}</code>
+                    : <pre className="my-2 overflow-x-auto border-4 border-slate-900 bg-slate-900 p-3 font-mono text-xs text-yellow-300 dark:border-slate-500 dark:bg-slate-950" style={{boxShadow:'3px 3px 0 rgb(15 23 42)'}}><code>{children}</code></pre>,
                 blockquote: ({ children }) => <blockquote className="border-l-4 border-slate-400 pl-3 italic opacity-80 my-2">{children}</blockquote>,
                 a:      ({ href, children }) => <a className="underline font-black hover:opacity-70" href={href} target="_blank" rel="noreferrer">{children}</a>,
-                hr:     () => <hr className="border-2 border-slate-900 my-3" />,
+                hr:     () => <hr className="my-3 border-2 border-slate-900 dark:border-slate-300" />,
                 table:  ({ children }) => <table className="border-collapse w-full text-xs my-2">{children}</table>,
-                th:     ({ children }) => <th className="border-2 border-slate-900 px-2 py-1 bg-slate-100 font-black uppercase">{children}</th>,
-                td:     ({ children }) => <td className="border-2 border-slate-900 px-2 py-1">{children}</td>,
+                th:     ({ children }) => <th className="border-2 border-slate-900 bg-slate-100 px-2 py-1 font-black uppercase dark:border-slate-300 dark:bg-slate-700">{children}</th>,
+                td:     ({ children }) => <td className="border-2 border-slate-900 px-2 py-1 dark:border-slate-300">{children}</td>,
               }}
             >
               {message.content}
             </Markdown>
             {isStreaming && (
-              <span className="inline-block w-2 h-4 bg-slate-900 ml-0.5 align-middle animate-pulse" />
+              <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-slate-900 align-middle dark:bg-slate-200" />
             )}
           </div>
         )}
@@ -299,11 +303,11 @@ function ChatArea({
 
   if (!conversation) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center bg-lime-300">
-        <div className="brutal-card bg-white text-center">
+      <div className="flex flex-1 flex-col items-center justify-center bg-emerald-200 dark:bg-emerald-800/80">
+        <div className="brutal-card bg-white text-center dark:bg-slate-800 dark:text-slate-100">
           <div className="flex justify-center"><IconWeather /></div>
           <h2 className="mt-4 text-2xl font-black uppercase">WeatherPocket AI</h2>
-          <p className="mt-2 text-sm font-bold uppercase text-slate-500">
+          <p className="mt-2 text-sm font-bold uppercase text-slate-500 dark:text-slate-300">
             Select or create a conversation to start.
           </p>
         </div>
@@ -312,17 +316,17 @@ function ChatArea({
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="border-b-4 border-slate-900 bg-white px-6 py-4">
-        <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Active Chat</p>
+    <div className="flex h-full flex-1 flex-col overflow-hidden border-4 border-slate-900 bg-white text-slate-900 shadow-[4px_4px_0_rgb(15_23_42)] dark:border-slate-300 dark:bg-slate-900 dark:text-slate-100">
+      <div className="border-b-4 border-slate-900 bg-slate-100 px-6 py-4 dark:border-slate-300 dark:bg-slate-800">
+        <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">Active Chat</p>
         <h2 className="text-lg font-black uppercase">{conversation.title}</h2>
       </div>
 
-      <div className="flex-1 overflow-y-auto bg-zinc-50 p-6">
+      <div className="flex-1 overflow-y-auto bg-slate-50 p-5 dark:bg-slate-950">
         {loadingMessages ? (
-          <p className="text-center text-xs font-black uppercase text-slate-400">Loading messages...</p>
+          <p className="text-center text-xs font-black uppercase text-slate-500 dark:text-slate-300">Loading messages...</p>
         ) : messages.length === 0 ? (
-          <p className="text-center text-xs font-black uppercase text-slate-400">
+          <p className="text-center text-xs font-black uppercase text-slate-500 dark:text-slate-300">
             No messages yet. Say something!
           </p>
         ) : (
@@ -339,7 +343,7 @@ function ChatArea({
               <div className="flex items-end gap-2 justify-start">
                 <BotAvatar />
                 <div
-                  className="border-4 border-slate-900 bg-white px-4 py-3 text-xs font-black uppercase text-slate-400"
+                  className="border-4 border-slate-900 bg-white px-4 py-3 text-xs font-black uppercase text-slate-500 dark:border-slate-300 dark:bg-slate-800 dark:text-slate-200"
                   style={{ boxShadow: '4px 4px 0 rgb(15 23 42)' }}
                 >
                   AI is thinking...
@@ -351,13 +355,13 @@ function ChatArea({
         <div ref={bottomRef} />
       </div>
 
-      <form className="border-t-4 border-slate-900 bg-white p-4" onSubmit={handleSubmit}>
+      <form className="border-t-4 border-slate-900 bg-slate-100 p-4 dark:border-slate-300 dark:bg-slate-800" onSubmit={handleSubmit}>
         {activeFileIds?.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-1">
-            <span className="mr-1 self-center text-[10px] font-black uppercase text-slate-500">RAG:</span>
+            <span className="mr-1 self-center text-[10px] font-black uppercase text-slate-500 dark:text-slate-300">RAG:</span>
             {activeFileIds.map((id) => (
               <button
-                className="flex items-center gap-1 border-2 border-blue-600 bg-blue-100 px-2 py-0.5 text-[10px] font-black uppercase text-blue-800 hover:bg-blue-200"
+                className="flex items-center gap-1 border-2 border-blue-700 bg-blue-100 px-2 py-0.5 text-[10px] font-black uppercase text-blue-900 hover:bg-blue-200 dark:border-blue-300 dark:bg-blue-800 dark:text-blue-100 dark:hover:bg-blue-700"
                 key={id}
                 onClick={() => onRemoveActiveFile?.(id)}
                 title="Remove file from RAG"
@@ -369,7 +373,7 @@ function ChatArea({
             ))}
           </div>
         )}
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <input
             className="brutal-input flex-1"
             disabled={sending}
@@ -378,7 +382,7 @@ function ChatArea({
             value={input}
           />
           <button
-            className="brutal-button flex items-center gap-2 bg-blue-400"
+            className="brutal-button flex items-center justify-center gap-2 bg-blue-400"
             disabled={sending || !input.trim()}
             type="submit"
           >
@@ -406,6 +410,8 @@ function DocumentsPanel({ conversationId, activeFileIds, onToggleFile, onFilesCh
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [uploadStatus, setUploadStatus] = useState(null)
+  const [targetProgress, setTargetProgress] = useState(0)
+  const displayProgress = useSmoothProgress(targetProgress)
   const fileInputRef = useRef(null)
 
   useEffect(() => {
@@ -433,9 +439,13 @@ function DocumentsPanel({ conversationId, activeFileIds, onToggleFile, onFilesCh
     setError('')
     setUploading(true)
     setUploadStatus(null)
+    setTargetProgress(0)
     try {
       const result = await uploadFileWithProgress(conversationId, file, (event) => {
-        setUploadStatus(event)
+        if (event.type === 'progress') {
+          setTargetProgress(event.progress || 0)
+          setUploadStatus(event)
+        }
       })
       const newFiles = [result]
       setFiles((prev) => {
@@ -444,6 +454,7 @@ function DocumentsPanel({ conversationId, activeFileIds, onToggleFile, onFilesCh
         return updated
       })
       setUploadStatus(null)
+      setTargetProgress(0)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -471,13 +482,13 @@ function DocumentsPanel({ conversationId, activeFileIds, onToggleFile, onFilesCh
 
   return (
     <aside
-      className="flex w-72 shrink-0 flex-col border-l-4 border-slate-900 bg-lime-300"
+      className="hidden h-full w-72 shrink-0 flex-col border-4 border-slate-900 bg-emerald-300 text-slate-900 shadow-[4px_4px_0_rgb(15_23_42)] lg:flex dark:border-slate-300 dark:bg-emerald-700 dark:text-emerald-50"
     >
       {/* Header */}
-      <div className="flex h-14 shrink-0 items-center justify-between border-b-4 border-slate-900 px-3">
+      <div className="flex h-14 shrink-0 items-center justify-between border-b-4 border-slate-900 px-3 dark:border-slate-300">
         <span className="text-xs font-black uppercase tracking-[0.2em]">Documents</span>
         <button
-          className="flex h-8 w-8 items-center justify-center border-4 border-slate-900 bg-white hover:bg-lime-200 disabled:opacity-50"
+          className="flex h-8 w-8 items-center justify-center border-4 border-slate-900 bg-white hover:bg-emerald-100 disabled:opacity-50 dark:border-slate-300 dark:bg-slate-100 dark:hover:bg-white"
           disabled={uploading}
           onClick={() => fileInputRef.current?.click()}
           style={{ boxShadow: '2px 2px 0 rgb(15 23 42)' }}
@@ -501,30 +512,42 @@ function DocumentsPanel({ conversationId, activeFileIds, onToggleFile, onFilesCh
 
       {/* Upload progress indicator */}
       {uploadStatus && (
-        <div className="border-b-2 border-blue-600 bg-blue-100 px-3 py-2">
-          <div className="mb-1 text-[9px] font-black uppercase text-blue-800">
-            {uploadStatus.message}
+        <div className="border-b-2 border-blue-700 bg-blue-100 px-3 py-2 dark:border-blue-300 dark:bg-blue-900/70">
+          <div className="mb-1 flex items-center justify-between">
+            <div className="text-[9px] font-black uppercase text-blue-900 dark:text-blue-100">
+              {uploadStatus.message}
+            </div>
+            {CONFIG.DEBUG_UPLOAD_PROGRESS && (
+              <div className="text-[8px] font-mono text-blue-700 dark:text-blue-200">
+                Raw: {uploadStatus.progress}% | Stage: {uploadStatus.stage}
+              </div>
+            )}
           </div>
-          <div className="h-2 w-full overflow-hidden border-2 border-blue-600 bg-white">
+          <div className="h-2 w-full overflow-hidden border-2 border-blue-700 bg-white dark:border-blue-300 dark:bg-slate-200">
             <div
-              className="h-full bg-blue-600 transition-all duration-300"
-              style={{ width: `${uploadStatus.progress}%` }}
+              className="h-full bg-blue-700 transition-all duration-500 dark:bg-blue-300"
+              style={{ width: `${displayProgress}%` }}
             />
           </div>
-          {uploadStatus.meta && (
-            <div className="mt-1 text-[8px] font-bold text-blue-700">
-              {uploadStatus.meta.completed && uploadStatus.meta.total
+          <div className="mt-1 flex items-center justify-between">
+            <div className="text-[8px] font-bold text-blue-900 dark:text-blue-100">
+              {uploadStatus.meta && uploadStatus.meta.completed && uploadStatus.meta.total
                 ? `${uploadStatus.meta.completed}/${uploadStatus.meta.total}`
-                : `${uploadStatus.progress}% complete`}
+                : `${displayProgress}% complete`}
             </div>
-          )}
+            {CONFIG.DEBUG_UPLOAD_PROGRESS && (
+              <div className="text-[7px] text-blue-700 dark:text-blue-200">
+                Display: {displayProgress}%
+              </div>
+            )}
+          </div>
         </div>
       )}
 
       {/* Search box */}
-      <div className="border-b-2 border-slate-900 px-3 py-2">
+      <div className="border-b-2 border-slate-900 bg-white/70 px-3 py-2 dark:border-slate-300 dark:bg-slate-900/40">
         <input
-          className="w-full border-2 border-slate-900 bg-white px-2 py-1 text-[10px] font-bold placeholder-slate-400 focus:outline-none"
+          className="w-full border-2 border-slate-900 bg-white px-2 py-1 text-[10px] font-bold placeholder-slate-500 focus:outline-none dark:border-slate-300 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-400"
           onChange={(e) => setSearch(e.target.value.toLowerCase())}
           placeholder="Search PDFs..."
           style={{ boxShadow: '1px 1px 0 rgb(15 23 42)' }}
@@ -536,14 +559,14 @@ function DocumentsPanel({ conversationId, activeFileIds, onToggleFile, onFilesCh
       {/* File list */}
       <div className="flex-1 overflow-y-auto">
         {error && (
-          <p className="border-b-2 border-red-400 bg-red-100 px-3 py-2 text-[10px] font-black uppercase text-red-700">
+          <p className="border-b-2 border-red-500 bg-red-100 px-3 py-2 text-[10px] font-black uppercase text-red-700 dark:bg-red-900/70 dark:text-red-100">
             {error}
           </p>
         )}
         {loading ? (
-          <p className="p-4 text-[10px] font-black uppercase text-slate-500">Loading...</p>
+          <p className="p-4 text-[10px] font-black uppercase text-slate-600 dark:text-emerald-100">Loading...</p>
         ) : files.length === 0 ? (
-          <p className="p-4 text-[10px] font-black uppercase text-slate-500">
+          <p className="p-4 text-[10px] font-black uppercase text-slate-600 dark:text-emerald-100">
             No PDFs yet. Upload one to enable RAG.
           </p>
         ) : (
@@ -551,8 +574,8 @@ function DocumentsPanel({ conversationId, activeFileIds, onToggleFile, onFilesCh
             const active = activeFileIds.includes(f.file_id)
             return (
               <div
-                className={`group flex items-center gap-2 border-b-2 border-slate-900 px-3 py-3 ${
-                  active ? 'bg-blue-400' : 'hover:bg-lime-200'
+                className={`group flex items-center gap-2 border-b-2 border-slate-900 px-3 py-3 dark:border-slate-300 ${
+                  active ? 'bg-blue-500 text-white dark:bg-blue-700' : 'hover:bg-emerald-200 dark:hover:bg-emerald-600/70'
                 }`}
                 key={f.file_id}
               >
@@ -563,8 +586,8 @@ function DocumentsPanel({ conversationId, activeFileIds, onToggleFile, onFilesCh
 
                 {/* Toggle button */}
                 <button
-                  className={`flex h-7 w-7 shrink-0 items-center justify-center border-4 border-slate-900 ${
-                    active ? 'bg-slate-900 text-white' : 'bg-white hover:bg-blue-200'
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center border-4 border-slate-900 dark:border-slate-300 ${
+                    active ? 'bg-slate-900 text-white dark:bg-slate-200 dark:text-slate-900' : 'bg-white hover:bg-blue-200 dark:bg-slate-100 dark:hover:bg-blue-200'
                   }`}
                   onClick={() => onToggleFile(f.file_id)}
                   style={{ boxShadow: '2px 2px 0 rgb(15 23 42)' }}
@@ -577,7 +600,7 @@ function DocumentsPanel({ conversationId, activeFileIds, onToggleFile, onFilesCh
                 {/* File info */}
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-[11px] font-black uppercase">{f.file_name}</span>
-                  <span className="text-[9px] font-bold text-slate-600">{f.chunks} chunks</span>
+                  <span className="text-[9px] font-bold text-slate-600 dark:text-emerald-100">{f.chunks} chunks</span>
                 </div>
 
                 {/* Delete */}
@@ -597,7 +620,7 @@ function DocumentsPanel({ conversationId, activeFileIds, onToggleFile, onFilesCh
 
       {/* Active count badge at bottom */}
       {activeFileIds.length > 0 && (
-        <div className="border-t-4 border-slate-900 bg-blue-400 px-3 py-2">
+        <div className="border-t-4 border-slate-900 bg-blue-500 px-3 py-2 text-white dark:border-slate-300 dark:bg-blue-700">
           <p className="text-[10px] font-black uppercase">
             {activeFileIds.length} file{activeFileIds.length > 1 ? 's' : ''} active for RAG
           </p>
@@ -727,8 +750,8 @@ export default function HomeScreen({ user, onLogout }) {
   }, [])
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
-      <header className="flex shrink-0 items-center justify-between border-b-4 border-slate-900 bg-black px-6 py-4 text-white">
+    <div className="flex h-screen flex-col overflow-hidden bg-zinc-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+      <header className="flex shrink-0 items-center justify-between border-b-4 border-slate-900 bg-black px-4 py-3 text-white dark:border-slate-300">
         <div className="flex items-center gap-3">
           <IconWeather />
           <div>
@@ -737,7 +760,7 @@ export default function HomeScreen({ user, onLogout }) {
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <span className="hidden text-xs font-bold text-slate-400 md:block">{user?.email}</span>
+          <span className="hidden text-xs font-bold text-slate-300 md:block">{user?.email}</span>
           <button
             className="brutal-button bg-red-500 text-black hover:bg-red-400"
             onClick={onLogout}
@@ -748,7 +771,7 @@ export default function HomeScreen({ user, onLogout }) {
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 gap-2 overflow-hidden p-2">
         <Sidebar
           activeId={activeConversation?.id}
           collapsed={sidebarCollapsed}
@@ -759,19 +782,21 @@ export default function HomeScreen({ user, onLogout }) {
           onSelect={(conv) => { setActiveConversation(normalizeConv(conv)); setActiveFileIds([]) }}
           onToggle={() => setSidebarCollapsed((v) => !v)}
         />
-        <ChatArea
-          conversation={activeConversation}
-          fileMap={filesMap}
-          loadingMessages={loadingMessages}
-          messages={messages}
-          onRemoveActiveFile={(id) =>
-            setActiveFileIds((prev) => prev.filter((x) => x !== id))
-          }
-          onSend={handleSend}
-          sending={sending}
-          user={user}
-          activeFileIds={activeFileIds}
-        />
+        <div className="min-w-0 flex-1">
+          <ChatArea
+            conversation={activeConversation}
+            fileMap={filesMap}
+            loadingMessages={loadingMessages}
+            messages={messages}
+            onRemoveActiveFile={(id) =>
+              setActiveFileIds((prev) => prev.filter((x) => x !== id))
+            }
+            onSend={handleSend}
+            sending={sending}
+            user={user}
+            activeFileIds={activeFileIds}
+          />
+        </div>
         <DocumentsPanel
           conversationId={activeConversation?.id}
           activeFileIds={activeFileIds}

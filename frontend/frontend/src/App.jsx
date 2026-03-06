@@ -65,7 +65,7 @@ export default function App() {
   }
 
   if (status === 'checking') {
-    return <div className="min-h-screen bg-zinc-100" />
+    return <div className="min-h-screen bg-zinc-100 dark:bg-slate-900" />
   }
 
   if (status === 'authenticated') {

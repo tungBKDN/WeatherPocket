@@ -215,3 +215,6 @@ yarn.lock
 .eslintcache
 dist/
 .vite
+
+# Cached files
+cached/

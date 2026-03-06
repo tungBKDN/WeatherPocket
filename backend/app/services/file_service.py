@@ -5,6 +5,7 @@ from app.models.file_content import ChunkContent, FileContent
 from app.repositories.file_content_repository import FileContentRepository
 from app.services.rag_service import RagService
 from app.utils.pdf_parser import extract_text_from_pdf
+from app.utils.progress_tracker import ProgressTracker
 
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -34,30 +35,28 @@ class FileService:
         progress_callback: Optional[Callable[[str, int, str, Optional[dict]], Awaitable[None]]] = None,
     ) -> FileContent:
         """
-        Full pipeline:
-          1. Save PDF temporarily
-          2. Extract text
-          3. Chunk text
-          4. Save FileContent skeleton to MongoDB  →  get file_id
-          5. Embed chunks + index into Qdrant     →  get vector_ids
-          6. Back-fill vector_id on each ChunkContent in MongoDB
-          7. Return final FileContent
+        Full pipeline with 5 main steps:
+          1. Upload (0-20%)
+          2. Extract Text (20-40%)
+          3. Chunking (40-60%)
+          4. Embedding (60-80%)
+          5. Save to DB/Qdrant (80-100%)
         """
-        async def emit(stage: str, progress: int, message: str, meta: Optional[dict] = None):
+        async def emit(stage: str, stage_progress: int, message: str, meta: Optional[dict] = None):
             if progress_callback:
-                await progress_callback(stage, progress, message, meta)
+                overall_progress = ProgressTracker.calculate_progress(stage, stage_progress)
+                await progress_callback(stage, overall_progress, message, meta)
 
-        # 1. Write temp file
+        # Step 1: Upload
+        await emit("upload", 100, "File uploaded successfully")
+
         tmp_path = os.path.join(UPLOAD_DIR, f"{conversation_id}_{file_name}")
-        await emit("upload", 100, "Upload completed")
-
         with open(tmp_path, "wb") as f:
             f.write(raw_bytes)
 
-        await emit("extract_text", 10, "Extracting text from PDF")
-
+        # Step 2: Extract Text
+        await emit("extract_text", 0, "Starting text extraction...")
         try:
-            # 2. Extract text
             text = extract_text_from_pdf(tmp_path)
         finally:
             os.remove(tmp_path)
@@ -65,14 +64,15 @@ class FileService:
         if not text.strip():
             raise ValueError("Could not extract text from the PDF.")
 
-        await emit("extract_text", 100, "PDF converted to text")
+        await emit("extract_text", 100, "PDF converted to text successfully")
 
-        # 3. Chunk
-        await emit("chunking", 10, "Chunking extracted text")
+        # Step 3: Chunking
+        await emit("chunking", 0, "Starting chunking process...")
         chunks = self.rag.chunking(text)
-        await emit("chunking", 100, "Chunking complete", {"chunks": len(chunks)})
+        await emit("chunking", 100, f"Chunking complete: {len(chunks)} chunks created", {"chunks": len(chunks)})
 
-        # 4. Build ChunkContent list (vector_id empty for now) and save to MongoDB
+        # Step 4: Save to MongoDB
+        await emit("save", 0, "Saving file metadata to database...")
         chunk_objects = [
             ChunkContent(chunk_index=i, content=chunk)
             for i, chunk in enumerate(chunks)
@@ -85,23 +85,23 @@ class FileService:
         )
         saved = await self.file_repo.create(file_content)
         file_id = str(saved.id)
+        await emit("save", 30, "File metadata saved")
 
-        # 5. Embed + index into Qdrant; get back one vector_id per chunk
-        await emit("embedding", 0, "Creating embeddings")
+        # Step 5: Embedding + Qdrant indexing
+        await emit("embedding", 0, f"Creating embeddings for {len(chunks)} chunks...")
+
+        num_batches = (len(chunks) + 15) // 16  # 16 chunks per batch (from rag_service)
 
         def on_embedding_progress(progress: int, completed: int, total: int):
             if not progress_callback:
                 return
-            progress_message = f"Embedding chunks ({completed}/{total})"
+            # Calculate embedding progress with batches
+            batch_num = (completed + 15) // 16
+            message = f"Batch {min(batch_num, num_batches)}/{num_batches}: {completed}/{total} chunks embedded"
             import asyncio
             loop = asyncio.get_running_loop()
             loop.create_task(
-                progress_callback(
-                    "embedding",
-                    progress,
-                    progress_message,
-                    {"completed": completed, "total": total},
-                )
+                emit("embedding", progress, message, {"completed": completed, "total": total})
             )
 
         vector_ids = self.rag.indexing(
@@ -111,12 +111,12 @@ class FileService:
             progress_callback=on_embedding_progress,
         )
 
-        # 6. Back-fill vector_ids into the ChunkContent objects, then persist
+        # Step 5 continued: Back-fill vector_ids
+        await emit("save", 60, "Linking vectors with chunks...")
         for chunk_obj, vector_id in zip(saved.chunks, vector_ids):
             chunk_obj.vector_id = vector_id
         await self.file_repo.update_chunk_vector_ids(file_id, saved.chunks)
-
-        await emit("done", 100, "File indexed and ready", {"file_id": file_id})
+        await emit("save", 100, f"File '{file_name}' successfully indexed and ready for search", {"file_id": file_id})
 
         return saved
 

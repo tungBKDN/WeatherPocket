@@ -1,10 +1,10 @@
 from typing import Callable, List, Optional
 import uuid
 
-from langchain_text_splitters import CharacterTextSplitter
+from langchain_text_splitters import CharacterTextSplitter, RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, FieldCondition, Filter, MatchAny, PointStruct, VectorParams
+from qdrant_client.models import Distance, FieldCondition, Filter, MatchAny, PointStruct, VectorParams, PayloadSchemaType
 
 from app.core.config import settings
 
@@ -17,6 +17,7 @@ class RagService:
             model_name="BAAI/bge-small-en-v1.5",
             model_kwargs={"device": "cpu"},
             encode_kwargs={"normalize_embeddings": True},
+            cache_folder="./app/cached",
         )
         self._client = QdrantClient(
             url=settings.QDRANT_ENDPOINT,
@@ -29,8 +30,26 @@ class RagService:
         if settings.QDRANT_COLLECTION not in existing:
             self._client.create_collection(
                 collection_name=settings.QDRANT_COLLECTION,
-                vectors_config=VectorParams(size=384, distance=Distance.COSINE),
+                vectors_config=VectorParams(
+                    size=384, distance=Distance.COSINE),
             )
+            # Create payload indexes for filtering
+            try:
+                self._client.create_payload_index(
+                    collection_name=settings.QDRANT_COLLECTION,
+                    field_name="file_id",
+                    field_schema=PayloadSchemaType.KEYWORD,
+                )
+            except Exception as e:
+                print(f"Warning: Could not create file_id index: {e}")
+            try:
+                self._client.create_payload_index(
+                    collection_name=settings.QDRANT_COLLECTION,
+                    field_name="user_id",
+                    field_schema=PayloadSchemaType.KEYWORD,
+                )
+            except Exception as e:
+                print(f"Warning: Could not create user_id index: {e}")
 
     @classmethod
     def get_instance(cls) -> "RagService":
@@ -38,16 +57,17 @@ class RagService:
             cls._instance = cls()
         return cls._instance
 
-
     def chunking(self, text: str) -> List[str]:
         """Split text into overlapping chunks."""
-        splitter = CharacterTextSplitter.from_tiktoken_encoder(
-            encoding_name="cl100k_base",
-            chunk_size=50,
-            chunk_overlap=10,
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1024,
+            chunk_overlap=256,
+            separators=["\n\n", "\n", ". ", " ", ""],  # Tries each in order
+            keep_separator=False,
         )
-        return splitter.split_text(text)
-
+        chunks = splitter.split_text(text)
+        print(f"DEBUG: Split {len(text)} chars into {len(chunks)} chunks")
+        return chunks
 
     def indexing(
         self,
@@ -75,12 +95,18 @@ class RagService:
         for start in range(0, total_chunks, batch_size):
             batch = chunks[start:start + batch_size]
             batch_vectors = self._embedder.embed_documents(batch)
-            vectors.extend(batch_vectors)
 
-            if progress_callback:
-                completed = min(start + len(batch), total_chunks)
-                progress = int((completed / total_chunks) * 100)
-                progress_callback(progress, completed, total_chunks)
+            # Pad vectors to 512 dimensions if needed
+            for vector in batch_vectors:
+                if len(vector) < 512:
+                    vector.extend([0.0] * (512 - len(vector)))
+
+                vectors.extend(batch_vectors)
+
+                if progress_callback:
+                    completed = min(start + len(batch), total_chunks)
+                    progress = int((completed / total_chunks) * 100)
+                    progress_callback(progress, completed, total_chunks)
 
         vector_ids = [str(uuid.uuid4()) for _ in chunks]
 
@@ -119,9 +145,12 @@ class RagService:
         Returns the raw text content of the top-k most relevant chunks.
         """
         vector = self._embedder.embed_query(query)
-        results = self._client.search(
+        # Padding the vector to 512 dimensions if needed
+        if len(vector) < 512:
+            vector.extend([0.0] * (512 - len(vector)))
+        results = self._client.query_points(
             collection_name=settings.QDRANT_COLLECTION,
-            query_vector=vector,
+            query=vector,
             query_filter=Filter(
                 must=[
                     FieldCondition(
@@ -131,7 +160,7 @@ class RagService:
                 ]
             ),
             limit=top_k,
-        )
+        ).points
         return [hit.payload["content"] for hit in results]
 
     def delete_by_file(self, vector_ids: List[str]) -> None:
