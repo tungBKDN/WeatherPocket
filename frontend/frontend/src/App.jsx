@@ -64,29 +64,31 @@ export default function App() {
     setStatus('unauthenticated')
   }
 
+  let content = null
+
   if (status === 'checking') {
-    return <div className="min-h-screen bg-zinc-100 dark:bg-slate-900" />
+    content = <div className="h-full w-full bg-white dark:bg-zinc-950" />
+  } else if (status === 'authenticated') {
+    content = <HomeScreen user={user} onLogout={handleLogout} />
+  } else {
+    content = (
+      <LoginScreen
+        authMode={authMode}
+        email={email}
+        error={error}
+        fullname={fullname}
+        onAuthModeChange={(mode) => {
+          setAuthMode(mode)
+          setError('')
+        }}
+        onEmailChange={setEmail}
+        onFullnameChange={setFullname}
+        onPasswordChange={setPassword}
+        onSubmit={handleAuthSubmit}
+        password={password}
+      />
+    )
   }
 
-  if (status === 'authenticated') {
-    return <HomeScreen user={user} onLogout={handleLogout} />
-  }
-
-  return (
-    <LoginScreen
-      authMode={authMode}
-      email={email}
-      error={error}
-      fullname={fullname}
-      onAuthModeChange={(mode) => {
-        setAuthMode(mode)
-        setError('')
-      }}
-      onEmailChange={setEmail}
-      onFullnameChange={setFullname}
-      onPasswordChange={setPassword}
-      onSubmit={handleAuthSubmit}
-      password={password}
-    />
-  )
+  return <div className="h-screen overflow-hidden">{content}</div>
 }

@@ -1,18 +1,17 @@
 from typing import List, Optional
-from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_core.messages import HumanMessage, AIMessage
 from app.core.langchain_config import base_chain
 from app.core.langchain_history import get_session_history
 from app.repositories.conversation_repository import ConversationRepository
 from app.services.rag_service import RagService
 
 
-def _build_rag_input(content: str, contexts: List[str]) -> str:
-    """Prepend retrieved context snippets to the user message."""
+def _build_rag_context(contexts: List[str]) -> str:
+    """Format retrieved context snippets for ephemeral injection (not saved to DB)."""
     joined = "\n\n---\n\n".join(contexts)
     return (
         f"Use the following document excerpts to help answer the question.\n\n"
-        f"{joined}\n\n"
-        f"---\n\nQuestion: {content}"
+        f"{joined}"
     )
 
 
@@ -22,12 +21,6 @@ class ChatService:
     def __init__(self):
         self.conversation_repo = ConversationRepository()
         self.rag = RagService.get_instance()
-        self.chain = RunnableWithMessageHistory(
-            base_chain,
-            get_session_history,
-            input_messages_key="input",
-            history_messages_key="chat_history",
-        )
 
     @classmethod
     def get_instance(cls) -> 'ChatService':
@@ -36,12 +29,12 @@ class ChatService:
             cls._instance = cls()
         return cls._instance
 
-    def _resolve_input(self, content: str, file_ids: Optional[List[str]]) -> str:
-        """If file_ids provided, enrich the user message with retrieved context."""
+    def _retrieve_context(self, content: str, file_ids: Optional[List[str]]) -> str:
+        """If file_ids provided, retrieve and format RAG context (ephemeral - not saved)."""
         if not file_ids:
-            return content
+            return ""
         contexts = self.rag.retrieving(query=content, file_ids=file_ids)
-        return _build_rag_input(content, contexts) if contexts else content
+        return _build_rag_context(contexts) if contexts else ""
 
     async def send_message(
         self,
@@ -57,15 +50,25 @@ class ChatService:
                 raise ValueError("Access denied")
             raise ValueError("Conversation not found")
 
-        enriched = self._resolve_input(content, file_ids)
+        # Retrieve RAG context (ephemeral - not saved)
+        rag_context = self._retrieve_context(content, file_ids)
+        history = get_session_history(conversation_id)
 
-        result = await self.chain.ainvoke(
-            {"input": enriched},
-            config={"configurable": {"session_id": conversation_id}},
-        )
+        # Build LLM input: RAG context + original question
+        llm_input = f"{rag_context}\n\n---\n\nQuestion: {content}" if rag_context else content
+
+        # Call LLM with enriched input + chat history
+        result = await base_chain.ainvoke({
+            "input": llm_input,
+            "chat_history": history.messages,
+        })
+
+        # Save ONLY the original user question and AI response (no RAG context)
+        history.add_message(HumanMessage(content=content))
+        history.add_message(AIMessage(content=result if isinstance(result, str) else str(result)))
 
         await self.conversation_repo.touch(conversation_id)
-        return result.content if hasattr(result, "content") else str(result)
+        return result if isinstance(result, str) else str(result)
 
     async def stream_message(
         self,
@@ -82,13 +85,25 @@ class ChatService:
                 raise ValueError("Access denied")
             raise ValueError("Conversation not found")
 
-        enriched = self._resolve_input(content, file_ids)
+        # Retrieve RAG context (ephemeral - not saved)
+        rag_context = self._retrieve_context(content, file_ids)
+        history = get_session_history(conversation_id)
 
-        async for chunk in self.chain.astream(
-            {"input": enriched},
-            config={"configurable": {"session_id": conversation_id}},
-        ):
+        # Build LLM input: RAG context + original question
+        llm_input = f"{rag_context}\n\n---\n\nQuestion: {content}" if rag_context else content
+
+        # Stream response and collect for saving
+        full_response = []
+        async for chunk in base_chain.astream({
+            "input": llm_input,
+            "chat_history": history.messages,
+        }):
+            full_response.append(chunk if isinstance(chunk, str) else str(chunk))
             yield chunk
+
+        # Save ONLY the original user question and AI response (no RAG context)
+        history.add_message(HumanMessage(content=content))
+        history.add_message(AIMessage(content="".join(full_response)))
 
         await self.conversation_repo.touch(conversation_id)
 

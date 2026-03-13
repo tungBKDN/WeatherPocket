@@ -17,6 +17,7 @@ class RagService:
             model_name="BAAI/bge-small-en-v1.5",
             model_kwargs={"device": "cpu"},
             encode_kwargs={"normalize_embeddings": True},
+            # local_files_only=True,
             cache_folder="./app/cached",
         )
         self._client = QdrantClient(

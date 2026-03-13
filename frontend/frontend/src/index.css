@@ -1,9 +1,65 @@
 @import "tailwindcss";
 
-:root {
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  line-height: 1.5;
+/* ── SF Pro Rounded – local font-face declarations ── */
+@font-face {
+  font-family: 'SF Pro Rounded';
+  src: url('/fonts/SF-Pro-Rounded-Thin.ttf') format('truetype');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SF Pro Rounded';
+  src: url('/fonts/SF-Pro-Rounded-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SF Pro Rounded';
+  src: url('/fonts/SF-Pro-Rounded-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SF Pro Rounded';
+  src: url('/fonts/SF-Pro-Rounded-Semibold.ttf') format('truetype');
   font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SF Pro Rounded';
+  src: url('/fonts/SF-Pro-Rounded-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SF Pro Rounded';
+  src: url('/fonts/SF-Pro-Rounded-Heavy.ttf') format('truetype');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SF Pro Rounded';
+  src: url('/fonts/SF-Pro-Rounded-Black.ttf') format('truetype');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  /* Tailwind v4: --font-sans maps to the font-sans utility class */
+  --font-sans: 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+:root {
+  font-family: 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.6;
+  font-weight: 400;
   color-scheme: light dark;
 
   font-synthesis: none;
@@ -12,61 +68,260 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-body {
+/* Force root elements to strictly respect viewport height and ignore injected AdSense auto heights */
+html, body, #root {
+  height: 100vh !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
+  width: 100vw !important;
   margin: 0;
+  padding: 0;
+}
+
+/* Ensure the main flex wrapper also ignores injected styles */
+#root > div {
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
+body {
   min-width: 360px;
-  color: rgb(15 23 42);
-  background: rgb(234 234 235);
+  font-family: 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #18181b;
+  background: #ffffff;
 }
 
-#root {
-  min-height: 100vh;
-}
-
-.brutal-card {
-  border: 4px solid rgb(15 23 42);
-  box-shadow: 10px 10px 0 rgb(15 23 42);
-  border-radius: 0;
-  padding: 1.25rem;
-}
-
-.brutal-input {
+/* Editorial Input Styling */
+.editorial-input {
   width: 100%;
-  border: 4px solid rgb(15 23 42);
-  border-radius: 0;
-  padding: 0.75rem 0.85rem;
-  font-size: 0.95rem;
-  font-weight: 700;
+  border: 1px solid rgb(214 211 209);
+  border-radius: 2px;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.9375rem;
+  font-weight: 400;
   background: white;
+  font-family: var(--font-family-sans);
+  transition: border-color 150ms ease;
 }
 
-.brutal-input:focus {
+.editorial-input:focus-visible {
+  box-shadow: 0 0 0 2px rgba(120, 113, 108, 0.22);
+}
+
+.editorial-input:focus {
   outline: none;
-  box-shadow: 6px 6px 0 rgb(15 23 42);
+  border-color: rgb(120 113 108);
 }
 
-.brutal-button {
-  border: 4px solid rgb(15 23 42);
-  box-shadow: 6px 6px 0 rgb(15 23 42);
-  border-radius: 0;
-  background: rgb(250 204 21);
-  color: rgb(15 23 42);
-  font-size: 0.8rem;
-  font-weight: 900;
+.editorial-input::placeholder {
+  color: rgb(168 162 158);
+}
+
+/* Editorial Button Styling */
+.editorial-button {
+  border: 1px solid rgb(161 161 170);
+  border-radius: 6px;
+  background: transparent;
+  color: rgb(63 63 70);
+  font-size: 0.8125rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 0.75rem 1rem;
-  transition: transform 80ms ease;
+  letter-spacing: 0.05em;
+  padding: 0.5rem 1rem;
+  transition: all 150ms ease;
+  font-family: var(--font-family-sans);
 }
 
-.brutal-button:hover {
-  transform: translate(-2px, -2px);
+.editorial-button:hover {
+  border-color: rgb(113 113 122);
+  background: rgb(244 244 245);
+  transform: translateY(-1px);
 }
 
-.brutal-button:active {
-  transform: translate(1px, 1px);
+.editorial-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
+.editorial-chip {
+  border: 1px solid rgb(228 228 231);
+  border-radius: 9999px;
+  background: rgb(244 244 245);
+  color: rgb(63 63 70);
+}
+
+.conversation-turn {
+  animation: fade-slide-up 260ms ease-out both;
+}
+
+.message-collapse-shell {
+  position: relative;
+}
+
+.message-collapse-shell.is-collapsible {
+  overflow: hidden;
+  transition: height 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.message-collapse-content {
+  min-height: 0;
+}
+
+.message-collapse-fade {
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2.2rem;
+}
+
+.message-collapse-fade-human {
+  background: linear-gradient(to top, rgb(250 204 21) 0%, rgba(250, 204, 21, 0) 100%);
+}
+
+.message-collapse-fade-ai {
+  background: linear-gradient(to top, rgb(255 255 255) 0%, rgba(255, 255, 255, 0) 100%);
+}
+
+
+.typing-dots span {
+  display: inline-block;
+  width: 0.35rem;
+  height: 0.35rem;
+  margin-right: 0.2rem;
+  border-radius: 9999px;
+  background: rgb(120 113 108);
+  animation: blink-dot 1.2s infinite ease-in-out;
+}
+
+.typing-dots span:nth-child(2) {
+  animation-delay: 0.16s;
+}
+
+.typing-dots span:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+@keyframes fade-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes blink-dot {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+  40% {
+    transform: translateY(-2px);
+    opacity: 1;
+  }
+}
+
+@keyframes chat-input-dock-up {
+  0% {
+    transform: translateY(0);
+  }
+  65% {
+    transform: translateY(-25px);
+  }
+  100% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes chat-input-dock-down {
+  0% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.chat-input-dock-up {
+  animation: chat-input-dock-up 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.chat-input-dock-down {
+  animation: chat-input-dock-down 200ms ease-out both;
+}
+
+.chat-input-seam {
+  background:
+    linear-gradient(to bottom, rgba(248, 250, 252, 0), rgba(255, 255, 255, 0.2) 48%, rgba(255, 255, 255, 0.98) 100%);
+  /* backdrop-filter: blur(18px) saturate(128%); */
+  /* -webkit-backdrop-filter: blur(18px) saturate(128%); */
+}
+
+.chat-file-chip-uploading {
+  border-color: rgb(217 119 6 / 0.45);
+  background: linear-gradient(90deg, rgb(254 215 170 / 0.92), rgb(251 191 36 / 0.9));
+  color: rgb(24 24 27);
+  animation: chip-bob 580ms cubic-bezier(0.22, 1, 0.36, 1) infinite alternate;
+}
+
+.chat-upload-progress {
+  transition: width 340ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.chat-file-popover-open {
+  animation: file-popover-in 320ms cubic-bezier(0.22, 1.16, 0.36, 1) both;
+  transform-origin: bottom center;
+}
+
+.chat-file-popover-closed {
+  animation: file-popover-out 220ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  transform-origin: bottom center;
+}
+
+@keyframes chip-bob {
+  0% {
+    transform: translateY(0);
+    box-shadow: 0 4px 10px rgb(234 179 8 / 0.16);
+  }
+  100% {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgb(234 179 8 / 0.24);
+  }
+}
+
+@keyframes file-popover-in {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.94);
+  }
+  68% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes file-popover-out {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+}
+
+/* Utility Classes */
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -76,35 +331,197 @@ body {
   display: none;
 }
 
+/* Always-visible chat scrollbar */
+.chat-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(161 161 170) transparent;
+}
+
+.chat-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb {
+  background: rgb(161 161 170);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgb(113 113 122);
+  background-clip: content-box;
+}
+
+/* ── Streaming word fade-in animation ── */
+.word-appear {
+  display: inline;
+  animation: word-fade-in 180ms ease-out both;
+}
+
+@keyframes word-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Weather Animation Keyframes */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-15px); }
+}
+
+@keyframes rain {
+  0% { transform: translateY(-10px); opacity: 0; }
+  50% { opacity: 1; }
+  100% { transform: translateY(30px); opacity: 0; }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-float { animation: float 4s ease-in-out infinite; }
+.animate-float-delayed { animation: float 4s ease-in-out 2s infinite; }
+.animate-rain { animation: rain 1s linear infinite; }
+.animate-spin-slow { animation: spin-slow 12s linear infinite; }
+
+/* ─── Editorial Ambient Weather Orbs ─── */
+@keyframes orb-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(18px, -14px) scale(1.06); }
+  66%       { transform: translate(-12px, 10px) scale(0.96); }
+}
+@keyframes orb-drift-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  40%       { transform: translate(-22px, 16px) scale(1.08); }
+  75%       { transform: translate(14px, -10px) scale(0.94); }
+}
+@keyframes orb-pulse {
+  0%, 100% { opacity: 0.55; }
+  50%       { opacity: 0.82; }
+}
+
+/* Light-mode orbs */
+.weather-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(64px);
+}
+.weather-orb-1 {
+  width: 340px; height: 340px;
+  top: -120px; right: -100px;
+  background: radial-gradient(circle, rgba(251,191,36,0.28) 0%, rgba(253,224,100,0.13) 55%, transparent 80%);
+  animation: orb-drift 16s ease-in-out infinite, orb-pulse 9s ease-in-out infinite;
+}
+.weather-orb-2 {
+  width: 280px; height: 280px;
+  bottom: -90px; left: -70px;
+  background: radial-gradient(circle, rgba(254,215,170,0.26) 0%, rgba(251,191,36,0.09) 55%, transparent 78%);
+  animation: orb-drift-2 19s ease-in-out infinite, orb-pulse 11s ease-in-out 2s infinite;
+}
+.weather-orb-3 {
+  width: 200px; height: 200px;
+  top: 38%; left: 25%;
+  background: radial-gradient(circle, rgba(255,244,220,0.20) 0%, transparent 70%);
+  animation: orb-drift 24s ease-in-out 5s infinite, orb-pulse 13s ease-in-out 1s infinite;
+  filter: blur(52px);
+}
+
+/* Dark-mode orbs — hidden by default, shown in dark media query below */
+.weather-orb-dark { display: none; }
+
+/* Dark Mode */
 @media (prefers-color-scheme: dark) {
   body {
-    color: rgb(226 232 240);
-    background: rgb(2 6 23);
+    color: #E0E0E0;
+    background: #09090b;
+    color: #f4f4f5;
   }
 
-  .brutal-card {
-    border-color: rgb(148 163 184);
-    box-shadow: 10px 10px 0 rgb(15 23 42);
+  .editorial-input {
+    border-color: rgb(63 63 70);
+    background: #09090b;
+    color: #f4f4f5;
   }
 
-  .brutal-input {
-    border-color: rgb(148 163 184);
-    background: rgb(15 23 42);
-    color: rgb(248 250 252);
+  .editorial-input:focus {
+    border-color: rgb(113 113 122);
   }
 
-  .brutal-input::placeholder {
-    color: rgb(148 163 184);
+  .editorial-input::placeholder {
+    color: rgb(113 113 122);
   }
 
-  .brutal-input:focus {
-    box-shadow: 6px 6px 0 rgb(15 23 42);
+  .editorial-button {
+    border-color: rgb(82 82 91);
+    color: rgb(212 212 216);
   }
 
-  .brutal-button {
-    border-color: rgb(148 163 184);
-    box-shadow: 6px 6px 0 rgb(15 23 42);
-    background: rgb(250 204 21);
-    color: rgb(15 23 42);
+  .editorial-button:hover {
+    border-color: rgb(113 113 122);
+    background: rgb(24 24 27);
+  }
+
+  .editorial-chip {
+    border-color: rgb(63 63 70);
+    background: rgb(39 39 42);
+    color: rgb(212 212 216);
+  }
+
+  .typing-dots span {
+    background: rgb(113 113 122);
+  }
+
+  .message-collapse-fade-human {
+    background: linear-gradient(to top, rgb(234 179 8 / 0.95) 0%, rgba(234, 179, 8, 0) 100%);
+  }
+
+  .message-collapse-fade-ai {
+    background: linear-gradient(to top, rgb(39 39 42) 0%, rgba(39, 39, 42, 0) 100%);
+  }
+
+  .chat-input-seam {
+    background:
+      linear-gradient(to bottom, rgba(9, 9, 11, 0), rgba(9, 9, 11, 0.8) 48%, rgba(9, 9, 11, 0.98) 100%);
+    /* backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%); */
+  }
+
+  .chat-file-chip-uploading {
+    border-color: rgb(180 83 9 / 0.6);
+    background: linear-gradient(90deg, rgb(146 64 14 / 0.92), rgb(180 83 9 / 0.95));
+    color: white;
+  }
+
+  /* Dark-mode ambient orbs */
+  .weather-orb { display: none; }
+  .weather-orb-dark {
+    display: block;
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(72px);
+  }
+  .weather-orb-dark-1 {
+    width: 380px; height: 380px;
+    top: -130px; right: -110px;
+    background: radial-gradient(circle, rgba(180,120,30,0.20) 0%, rgba(120,80,20,0.09) 55%, transparent 80%);
+    animation: orb-drift 18s ease-in-out infinite, orb-pulse 10s ease-in-out infinite;
+  }
+  .weather-orb-dark-2 {
+    width: 260px; height: 260px;
+    bottom: -80px; left: -60px;
+    background: radial-gradient(circle, rgba(100,65,15,0.16) 0%, rgba(180,110,30,0.07) 55%, transparent 78%);
+    animation: orb-drift-2 22s ease-in-out infinite, orb-pulse 12s ease-in-out 3s infinite;
   }
 }
