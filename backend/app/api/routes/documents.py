@@ -162,6 +162,29 @@ async def list_files(
     ]
 
 
+@router.get("/files/{file_id}/chunks/{chunk_index}")
+async def get_file_chunk(
+    file_id: str,
+    chunk_index: int,
+    current_user=Depends(get_current_user),
+    service: FileService = Depends(get_file_service),
+):
+    """Fetch a specific chunk content for citation hover previews."""
+    try:
+        return await service.get_chunk_by_file_and_index(
+            file_id=file_id,
+            user_id=str(current_user.id),
+            chunk_index=chunk_index,
+        )
+    except ValueError as e:
+        msg = str(e)
+        if "access denied" in msg.lower() or "file not found" in msg.lower():
+            raise HTTPException(status_code=404, detail=msg)
+        if "chunk not found" in msg.lower():
+            raise HTTPException(status_code=404, detail=msg)
+        raise HTTPException(status_code=400, detail=msg)
+
+
 @router.delete("/{conversation_id}/files/{file_id}")
 async def delete_file(
     conversation_id: str,

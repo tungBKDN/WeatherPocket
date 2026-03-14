@@ -2,11 +2,20 @@ from typing import Callable, List, Optional
 import uuid
 
 from langchain_text_splitters import CharacterTextSplitter, RecursiveCharacterTextSplitter
+from pydantic import BaseModel
 from langchain_huggingface import HuggingFaceEmbeddings
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, FieldCondition, Filter, MatchAny, PointStruct, VectorParams, PayloadSchemaType
 
 from app.core.config import settings
+
+class RagResult(BaseModel):
+    content: str
+    file_id: str
+    chunk_index: int
+
+    def to_citation(self) -> str:
+        return f"(File: {self.file_id}, Chunk: {self.chunk_index}), Content: {self.content})"
 
 
 class RagService:
@@ -140,7 +149,7 @@ class RagService:
         query: str,
         file_ids: List[str],
         top_k: int = 5,
-    ) -> List[str]:
+    ) -> List[RagResult]:
         """
         Semantic search scoped to the given *file_ids*.
         Returns the raw text content of the top-k most relevant chunks.
@@ -162,7 +171,15 @@ class RagService:
             ),
             limit=top_k,
         ).points
-        return [hit.payload["content"] for hit in results]
+
+        return [
+            RagResult(
+                content=point.payload.get("content", ""),
+                file_id=point.payload.get("file_id", ""),
+                chunk_index=point.payload.get("chunk_index", -1),
+            )
+            for point in results
+        ]
 
     def delete_by_file(self, vector_ids: List[str]) -> None:
         """Remove all Qdrant points for a given file (by their vector UUIDs)."""

@@ -3,12 +3,13 @@ from langchain_core.messages import HumanMessage, AIMessage
 from app.core.langchain_config import base_chain
 from app.core.langchain_history import get_session_history
 from app.repositories.conversation_repository import ConversationRepository
-from app.services.rag_service import RagService
+from app.services.rag_service import RagResult, RagService
 
 
-def _build_rag_context(contexts: List[str]) -> str:
-    """Format retrieved context snippets for ephemeral injection (not saved to DB)."""
-    joined = "\n\n---\n\n".join(contexts)
+def _build_rag_context(contexts: List[RagResult]) -> str:
+    """Format retrieved context snippets for ephemeral injection (not saved to DB). And return a single string, but citation of file_id and chunk_index for each snippet."""
+    citations = [context.to_citation() for context in contexts]
+    joined = "\n\n---\n\n".join(citations)
     return (
         f"Use the following document excerpts to help answer the question.\n\n"
         f"{joined}"
@@ -91,6 +92,11 @@ class ChatService:
 
         # Build LLM input: RAG context + original question
         llm_input = f"{rag_context}\n\n---\n\nQuestion: {content}" if rag_context else content
+
+        # Log the input for debugging
+        print(f"DEBUG: Conversation ID: {conversation_id}, User ID: {user_id}")
+        print(f"DEBUG: Selected File IDs for RAG: {file_ids}")
+        print(f"DEBUG: LLM input:\n{llm_input}\n--- End of LLM input ---")
 
         # Stream response and collect for saving
         full_response = []

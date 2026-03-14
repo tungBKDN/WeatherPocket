@@ -220,3 +220,12 @@ export async function deleteFile(conversationId, fileId) {
   if (!res.ok) throw new Error(await parseError(res, 'Failed to delete file'))
   return res.json()
 }
+
+export async function getChunkCitation(fileId, chunkIndex) {
+  const res = await fetch(`/chat/files/${fileId}/chunks/${chunkIndex}`, {
+    headers: authHeaders(),
+    credentials: 'include',
+  })
+  if (!res.ok) throw new Error(await parseError(res, 'Failed to load citation chunk'))
+  return res.json()
+}

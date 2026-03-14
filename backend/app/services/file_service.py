@@ -125,6 +125,23 @@ class FileService:
     async def list_files(self, conversation_id: str) -> List[FileContent]:
         return await self.file_repo.list_by_conversation(conversation_id)
 
+    async def get_chunk_by_file_and_index(self, file_id: str, user_id: str, chunk_index: int) -> dict:
+        """Return chunk content for a given file + chunk index if user owns the file."""
+        file_content = await self.file_repo.get_by_id_and_user(file_id, user_id)
+        if not file_content:
+            raise ValueError("File not found or access denied.")
+
+        chunk = next((c for c in file_content.chunks if c.chunk_index == chunk_index), None)
+        if not chunk:
+            raise ValueError("Chunk not found.")
+
+        return {
+            "file_id": file_id,
+            "file_name": file_content.file_name,
+            "chunk_index": chunk.chunk_index,
+            "content": chunk.content,
+        }
+
     # ─── Delete ────────────────────────────────────────────────────────────────
 
     async def delete_file(self, file_id: str, user_id: str) -> None:

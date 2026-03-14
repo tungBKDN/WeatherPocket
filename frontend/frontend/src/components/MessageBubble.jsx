@@ -1,8 +1,124 @@
 import { useEffect, useRef, useState } from 'react'
-import Markdown from 'react-markdown'
+import Markdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { IconUser, IconBot } from './Icons'
 import StreamingText from './StreamingText'
+import { getChunkCitation } from '../services/chat'
+
+const CITATION_REGEX = /\$\[\s*([a-fA-F0-9]{24})\s*,\s*(\d+)\s*\]\$/g
+
+function normalizeCitationMarkup(content) {
+  if (!content) return content
+
+  const citationByKey = new Map()
+  let nextNumber = 0
+
+  return content.replace(CITATION_REGEX, (_, fileId, chunkIndexRaw) => {
+    const chunkIndex = Number(chunkIndexRaw)
+    const key = `${fileId}:${chunkIndex}`
+
+    if (!citationByKey.has(key)) {
+      citationByKey.set(key, nextNumber)
+      nextNumber += 1
+    }
+
+    const citationNumber = citationByKey.get(key)
+    return `[${citationNumber}](citation:${encodeURIComponent(fileId)}:${chunkIndex})`
+  })
+}
+
+function citationUrlTransform(url) {
+  if (typeof url === 'string' && url.startsWith('citation:')) {
+    return url
+  }
+  return defaultUrlTransform(url)
+}
+
+function CitationLink({ href, children }) {
+  const isCitation = typeof href === 'string' && href.startsWith('citation:')
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [payload, setPayload] = useState(null)
+  const [placement, setPlacement] = useState('above')
+  const closeTimerRef = useRef(null)
+  const anchorRef = useRef(null)
+
+  if (!isCitation) {
+    return <a className="underline underline-offset-2 opacity-80 hover:opacity-100" href={href} rel="noreferrer" target="_blank">{children}</a>
+  }
+
+  const [_, encodedFileId, chunkIndexRaw] = href.split(':')
+  const fileId = decodeURIComponent(encodedFileId)
+  const chunkIndex = Number(chunkIndexRaw)
+
+  const loadCitation = async () => {
+    if (loading || payload || error) return
+    setLoading(true)
+    try {
+      const data = await getChunkCitation(fileId, chunkIndex)
+      setPayload(data)
+    } catch (err) {
+      setError(err?.message || 'Failed to load citation')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const clearCloseTimer = () => {
+    if (!closeTimerRef.current) return
+    window.clearTimeout(closeTimerRef.current)
+    closeTimerRef.current = null
+  }
+
+  const handleOpen = () => {
+    const rect = anchorRef.current?.getBoundingClientRect()
+    if (rect) {
+      setPlacement(rect.top < window.innerHeight / 2 ? 'below' : 'above')
+    }
+    clearCloseTimer()
+    setOpen(true)
+    loadCitation()
+  }
+
+  const handleCloseSoon = () => {
+    clearCloseTimer()
+    closeTimerRef.current = window.setTimeout(() => {
+      setOpen(false)
+    }, 130)
+  }
+
+  useEffect(() => {
+    return () => clearCloseTimer()
+  }, [])
+
+  return (
+    <span
+      ref={anchorRef}
+      className="citation-anchor"
+      onBlur={handleCloseSoon}
+      onFocus={handleOpen}
+      onMouseEnter={handleOpen}
+      onMouseLeave={handleCloseSoon}
+      tabIndex={0}
+    >
+      <button className="citation-pill" onClick={() => (open ? setOpen(false) : handleOpen())} type="button">{children}</button>
+      {open && (
+        <div className={`citation-popover ${placement === 'below' ? 'citation-popover-below' : 'citation-popover-above'}`} onMouseEnter={handleOpen} onMouseLeave={handleCloseSoon} role="tooltip">
+          <p className="citation-popover-title">Source chunk</p>
+          {loading && <p className="citation-popover-meta">Loading...</p>}
+          {!loading && error && <p className="citation-popover-error">{error}</p>}
+          {!loading && !error && payload && (
+            <>
+              <p className="citation-popover-meta">{payload.file_name} • chunk #{payload.chunk_index}</p>
+              <div className="citation-popover-content">[...] {payload.content} [...]</div>
+            </>
+          )}
+        </div>
+      )}
+    </span>
+  )
+}
 
 const markdownComponents = {
   p:          ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
@@ -19,7 +135,7 @@ const markdownComponents = {
       ? <code className="rounded bg-zinc-200/60 dark:bg-zinc-700/60 px-1 py-0.5 font-mono text-[0.82em]">{children}</code>
       : <pre className="my-3 overflow-x-auto rounded-lg bg-zinc-900 dark:bg-zinc-950 p-4 font-mono text-sm text-zinc-100"><code>{children}</code></pre>,
   blockquote: ({ children }) => <blockquote className="border-l-2 border-yellow-400 pl-4 italic my-3 opacity-80">{children}</blockquote>,
-  a:          ({ href, children }) => <a className="underline underline-offset-2 opacity-80 hover:opacity-100" href={href} rel="noreferrer" target="_blank">{children}</a>,
+  a:          ({ href, children }) => <CitationLink href={href}>{children}</CitationLink>,
   hr:         () => <hr className="my-4 border-t border-current opacity-20" />,
   table:      ({ children }) => <table className="border-collapse w-full text-sm my-3">{children}</table>,
   th:         ({ children }) => <th className="border border-current/20 px-3 py-2 font-semibold text-left opacity-80">{children}</th>,
@@ -36,6 +152,7 @@ export default function MessageBubble({ message, isStreaming }) {
   const COLLAPSED_HEIGHT = 132
   const isLong = !isStreaming && message.content.length > COLLAPSE_THRESHOLD
   const displayContent = message.content
+  const markdownWithCitations = normalizeCitationMarkup(displayContent)
 
   useEffect(() => {
     if (!isLong) {
@@ -129,8 +246,8 @@ export default function MessageBubble({ message, isStreaming }) {
               {isStreaming ? (
                 <StreamingText content={message.content} />
               ) : (
-                <Markdown components={markdownComponents} remarkPlugins={[remarkGfm]}>
-                  {displayContent}
+                <Markdown components={markdownComponents} remarkPlugins={[remarkGfm]} urlTransform={citationUrlTransform}>
+                  {markdownWithCitations}
                 </Markdown>
               )}
             </div>
