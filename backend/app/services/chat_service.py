@@ -1,6 +1,6 @@
 from typing import List, Optional
 from langchain_core.messages import HumanMessage, AIMessage
-from app.core.langchain_config import base_chain
+from app.core.gemini_key_manager import get_gemini_key_manager
 from app.core.langchain_history import get_session_history
 from app.repositories.conversation_repository import ConversationRepository
 from app.services.rag_service import RagResult, RagService
@@ -59,10 +59,11 @@ class ChatService:
         llm_input = f"{rag_context}\n\n---\n\nQuestion: {content}" if rag_context else content
 
         # Call LLM with enriched input + chat history
-        result = await base_chain.ainvoke({
-            "input": llm_input,
-            "chat_history": history.messages,
-        })
+        key_manager = get_gemini_key_manager()
+        result = await key_manager.ainvoke(
+            input=llm_input,
+            chat_history=history.messages,
+        )
 
         # Save ONLY the original user question and AI response (no RAG context)
         history.add_message(HumanMessage(content=content))
@@ -100,10 +101,11 @@ class ChatService:
 
         # Stream response and collect for saving
         full_response = []
-        async for chunk in base_chain.astream({
-            "input": llm_input,
-            "chat_history": history.messages,
-        }):
+        key_manager = get_gemini_key_manager()
+        async for chunk in key_manager.astream(
+            input=llm_input,
+            chat_history=history.messages,
+        ):
             full_response.append(chunk if isinstance(chunk, str) else str(chunk))
             yield chunk
 

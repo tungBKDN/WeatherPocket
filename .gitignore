@@ -218,3 +218,5 @@ dist/
 
 # Cached files
 cached/
+
+/.vscode
