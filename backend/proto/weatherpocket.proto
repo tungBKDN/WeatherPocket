@@ -1,0 +1,185 @@
+syntax = "proto3";
+
+package weatherpocket.v1;
+
+service AuthService {
+  rpc SignUp(SignUpRequest) returns (AuthResponse);
+  rpc Login(LoginRequest) returns (AuthResponse);
+  rpc Logout(LogoutRequest) returns (Empty);
+  rpc RefreshToken(RefreshTokenRequest) returns (AuthResponse);
+  rpc GetMe(GetMeRequest) returns (UserResponse);
+}
+
+service ConversationService {
+  rpc CreateConversation(CreateConversationRequest) returns (ConversationResponse);
+  rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse);
+  rpc GetConversation(GetConversationRequest) returns (ConversationResponse);
+  rpc DeleteConversation(DeleteConversationRequest) returns (Empty);
+}
+
+service ChatService {
+  rpc CreateConversationFromPrompt(CreateConversationPromptRequest) returns (CreateConversationPromptResponse);
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+  rpc StreamMessage(StreamMessageRequest) returns (stream StreamMessageChunk);
+  rpc GetMessages(GetMessagesRequest) returns (GetMessagesResponse);
+}
+
+service DocumentService {
+  rpc UploadPdf(UploadPdfRequest) returns (UploadPdfResponse);
+  rpc UploadPdfStream(UploadPdfRequest) returns (stream UploadPdfProgressChunk);
+  rpc ListFiles(ListFilesRequest) returns (ListFilesResponse);
+  rpc DeleteFile(DeleteFileRequest) returns (Empty);
+  rpc GetChunk(GetChunkRequest) returns (ChunkResponse);
+}
+
+message Empty {}
+
+message UserResponse {
+  string id = 1;
+  string email = 2;
+  string fullname = 3;
+  bool is_active = 4;
+}
+
+message AuthResponse {
+  string access_token = 1;
+  string token_type = 2;
+  UserResponse user = 3;
+}
+
+message SignUpRequest {
+  string email = 1;
+  string fullname = 2;
+  string password = 3;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message LogoutRequest {}
+
+message RefreshTokenRequest {}
+
+message GetMeRequest {}
+
+message CreateConversationRequest {
+  string title = 1;
+}
+
+message ConversationResponse {
+  string id = 1;
+  string user_id = 2;
+  string title = 3;
+  string created_at = 4;
+  string updated_at = 5;
+}
+
+message ListConversationsRequest {}
+
+message ListConversationsResponse {
+  repeated ConversationResponse conversations = 1;
+}
+
+message GetConversationRequest {
+  string conversation_id = 1;
+}
+
+message DeleteConversationRequest {
+  string conversation_id = 1;
+}
+
+message CreateConversationPromptRequest {
+  string content = 1;
+}
+
+message CreateConversationPromptResponse {
+  string conversation_id = 1;
+}
+
+message SendMessageRequest {
+  string conversation_id = 1;
+  string content = 2;
+  repeated string file_ids = 3;
+}
+
+message SendMessageResponse {
+  string reply = 1;
+}
+
+message StreamMessageRequest {
+  string conversation_id = 1;
+  string content = 2;
+  repeated string file_ids = 3;
+}
+
+message StreamMessageChunk {
+  string content = 1;
+  bool done = 2;
+}
+
+message GetMessagesRequest {
+  string conversation_id = 1;
+}
+
+message GetMessagesResponse {
+  repeated Message messages = 1;
+}
+
+message Message {
+  string type = 1;
+  string content = 2;
+}
+
+message UploadPdfRequest {
+  string conversation_id = 1;
+  string file_name = 2;
+  bytes content = 3;
+}
+
+message UploadPdfResponse {
+  string file_id = 1;
+  string file_name = 2;
+  int32 chunks = 3;
+}
+
+message UploadPdfProgressChunk {
+  string type = 1;
+  string stage = 2;
+  int32 progress = 3;
+  string message = 4;
+  UploadPdfResponse result = 5;
+}
+
+message ListFilesRequest {
+  string conversation_id = 1;
+}
+
+message FileInfo {
+  string file_id = 1;
+  string file_name = 2;
+  int32 chunks = 3;
+  string upload_at = 4;
+}
+
+message ListFilesResponse {
+  repeated FileInfo files = 1;
+}
+
+message DeleteFileRequest {
+  string conversation_id = 1;
+  string file_id = 2;
+}
+
+message GetChunkRequest {
+  string file_id = 1;
+  int32 chunk_index = 2;
+}
+
+message ChunkResponse {
+  string file_id = 1;
+  string file_name = 2;
+  int32 chunk_index = 3;
+  string content = 4;
+}

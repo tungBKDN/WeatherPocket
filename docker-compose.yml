@@ -13,7 +13,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile.dev
     ports:
-      - "8000:8000"
+      - "8001:8001"
     volumes:
       - ./backend:/app
     environment:
@@ -23,18 +23,44 @@ services:
     depends_on:
       - mongodb
 
+  grpc-server:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    command: python -m app.grpc.server
+    ports:
+      - "50051:50051"
+    volumes:
+      - ./backend:/app
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - MONGO_URI=mongodb://mongodb:27017
+      - MONGO_DB=weatherpocket
+    depends_on:
+      - mongodb
+
+  envoy:
+    image: envoyproxy/envoy:v1.31-latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./envoy.yaml:/etc/envoy/envoy.yaml:ro
+    command: ["-c", "/etc/envoy/envoy.yaml"]
+    depends_on:
+      - grpc-server
+
   frontend:
     build:
-      context: ./frontend/frontend  # Changed this
-      dockerfile: ../Dockerfile.dev  # Changed this
+      context: ./frontend/frontend
+      dockerfile: ../Dockerfile.dev
     ports:
       - "5173:5173"
     volumes:
-      - ./frontend/frontend:/app  # Changed this
+      - ./frontend/frontend:/app
       - /app/node_modules
     environment:
       - CHOKIDAR_USEPOLLING=true
-      - API_URL=http://backend:8000
+      - API_URL=http://backend:8001
     depends_on:
       - backend
 

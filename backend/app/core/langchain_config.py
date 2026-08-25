@@ -1,14 +1,6 @@
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.output_parsers import StrOutputParser
-from app.core.config import settings
-from app.utils.md_reader import md_reader
 
-model = ChatGoogleGenerativeAI(
-    model="gemini-flash-latest",
-    google_api_key=settings.GEMINI_API_KEY,
-    streaming=True,
-)
+from app.utils.md_reader import md_reader
 
 system_prompt = md_reader("app/prompts/system_prompt.md")
 
@@ -18,4 +10,6 @@ prompt = ChatPromptTemplate.from_messages([
     ("human", "{input}"),
 ])
 
-base_chain = prompt | model | StrOutputParser()
+# NOTE: the LangChain model/chain is no longer built eagerly here with a single
+# key. GeminiKeyManager (app.core.gemini_key_manager) builds a fresh chain per
+# call using the currently-active key, rolling to the next key on 429/quota.

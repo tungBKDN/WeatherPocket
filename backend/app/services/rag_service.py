@@ -1,6 +1,11 @@
+import os
 from typing import Callable, List, Optional
 import uuid
 
+# Force PyTorch/SentenceTransformers onto CPU to prevent unsupported CUDA compute capability crashes
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
+import sentence_transformers  # Pre-import in main thread to prevent huggingface_hub multithreaded import race conditions
 from langchain_text_splitters import CharacterTextSplitter, RecursiveCharacterTextSplitter
 from pydantic import BaseModel
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -32,8 +37,12 @@ class RagService:
         self._client = QdrantClient(
             url=settings.QDRANT_ENDPOINT,
             api_key=settings.QDRANT_API_KEY,
+            check_compatibility=False,
         )
-        self._ensure_collection()
+        try:
+            self._ensure_collection()
+        except Exception as e:
+            print(f"Warning: Qdrant collection check failed: {e}")
 
     def _ensure_collection(self):
         existing = [c.name for c in self._client.get_collections().collections]
@@ -41,25 +50,19 @@ class RagService:
             self._client.create_collection(
                 collection_name=settings.QDRANT_COLLECTION,
                 vectors_config=VectorParams(
-                    size=384, distance=Distance.COSINE),
+                    size=512, distance=Distance.COSINE),
             )
-            # Create payload indexes for filtering
+
+        # Always ensure payload indexes for filtering exist
+        for field in ["file_id", "user_id"]:
             try:
                 self._client.create_payload_index(
                     collection_name=settings.QDRANT_COLLECTION,
-                    field_name="file_id",
+                    field_name=field,
                     field_schema=PayloadSchemaType.KEYWORD,
                 )
             except Exception as e:
-                print(f"Warning: Could not create file_id index: {e}")
-            try:
-                self._client.create_payload_index(
-                    collection_name=settings.QDRANT_COLLECTION,
-                    field_name="user_id",
-                    field_schema=PayloadSchemaType.KEYWORD,
-                )
-            except Exception as e:
-                print(f"Warning: Could not create user_id index: {e}")
+                print(f"Info: Payload index for {field}: {e}")
 
     @classmethod
     def get_instance(cls) -> "RagService":
@@ -111,12 +114,12 @@ class RagService:
                 if len(vector) < 512:
                     vector.extend([0.0] * (512 - len(vector)))
 
-                vectors.extend(batch_vectors)
+            vectors.extend(batch_vectors)
 
-                if progress_callback:
-                    completed = min(start + len(batch), total_chunks)
-                    progress = int((completed / total_chunks) * 100)
-                    progress_callback(progress, completed, total_chunks)
+            if progress_callback:
+                completed = min(start + len(batch), total_chunks)
+                progress = int((completed / total_chunks) * 100)
+                progress_callback(progress, completed, total_chunks)
 
         vector_ids = [str(uuid.uuid4()) for _ in chunks]
 
@@ -155,7 +158,6 @@ class RagService:
         Returns the raw text content of the top-k most relevant chunks.
         """
         vector = self._embedder.embed_query(query)
-        # Padding the vector to 512 dimensions if needed
         if len(vector) < 512:
             vector.extend([0.0] * (512 - len(vector)))
         results = self._client.query_points(
