@@ -1,12 +1,12 @@
 """Round-robin multi-key manager for Gemini.
 
 Loads all Gemini API keys from settings and builds a fresh LangChain
-chain per call, using the currently-active key. When a key hits a quota
-error (429 / ResourceExhausted) or is invalid/expired, it is marked dead
-for the rest of the process lifetime and the next key is rolled in.
-Only when *all* keys are dead do we let the original error propagate
-(so the caller sees a real 429).
+chain per call, using the currently-active key. When a key hits a quota / error
+(429, 403, 443 connection error, 500/503 server error, or invalid/expired), it is
+marked dead for the rest of the process lifetime and the next key is rolled in.
+Only when *all* keys are dead do we throw a clear error to the user.
 """
+import logging
 from typing import AsyncIterator, List, Optional
 
 from langchain_core.output_parsers import StrOutputParser
@@ -16,20 +16,40 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from app.core.config import settings
 from app.core.langchain_config import prompt
 
+logger = logging.getLogger(__name__)
+
 
 def _is_dead_key_error(e: BaseException) -> bool:
-    """True if the error means the current key should be retired (quota or
-    invalid/expired), False for transient/generic errors we should NOT
-    blame on the key."""
-    s = str(e)
+    """True if the error means the current key should be retired/rotated:
+    - 429 (Too Many Requests / Quota exhausted / Rate limit)
+    - 403 (Forbidden / Permission Denied / API key invalid)
+    - 401 (Unauthenticated)
+    - 443 / SSL / Connection / Socket / Timeout errors
+    - 500 / 502 / 503 / 504 (Server error / Service unavailable)
+    """
+    s = str(e).lower()
     name = type(e).__name__
-    # Quota exhausted.
-    if "429" in s or name == "ResourceExhausted":
+
+    # Specific status code / error string patterns
+    status_keywords = (
+        "429", "403", "401", "443", "500", "502", "503", "504", "400",
+        "resourceexhausted", "permissiondenied", "unauthenticated",
+        "serviceunavailable", "servererror", "internal-error", "invalidargument",
+        "connectionerror", "timeout", "sslerror", "connecttimeout", "readtimeout",
+        "socket", "connection refused", "reset by peer", "api_key_invalid",
+        "api key not valid", "quota", "rate limit"
+    )
+
+    if any(k in s for k in status_keywords):
         return True
-    # Invalid / expired / revoked key.
-    if name in ("PermissionDenied", "Unauthenticated") or "API_KEY_INVALID" in s \
-            or "API key not valid" in s or "PERMISSION_DENIED" in s:
+
+    if name in (
+        "ResourceExhausted", "PermissionDenied", "Unauthenticated", "ServiceUnavailable",
+        "ServerError", "InternalServerError", "InvalidArgument", "ConnectError",
+        "ConnectTimeout", "ReadTimeout", "SSLError", "HTTPStatusError"
+    ):
         return True
+
     return False
 
 
@@ -63,6 +83,8 @@ class GeminiKeyManager:
         """Return an alive key (and advance the pointer onto it), or None if
         every key is dead."""
         n = len(self._keys)
+        if n == 0:
+            return None
         for offset in range(n):
             i = (self._idx + offset) % n
             if self._keys[i] not in self._dead:
@@ -73,6 +95,12 @@ class GeminiKeyManager:
     def mark_dead(self, key: str) -> None:
         if key in self._keys:
             self._dead.add(key)
+            logger.warning(
+                "Gemini key ending in '...%s' marked DEAD (%d/%d alive left)",
+                key[-6:],
+                self.alive_count,
+                self.total,
+            )
 
     # -- chain building --------------------------------------------------
 
@@ -80,7 +108,7 @@ class GeminiKeyManager:
         # max_retries=1 => don't let the SDK retry on 429 against the SAME key;
         # we handle rotation ourselves.
         model = ChatGoogleGenerativeAI(
-            model="gemini-flash-latest",
+            model="gemini-3.6-flash",
             google_api_key=key,
             streaming=True,
             max_retries=1,
@@ -92,34 +120,39 @@ class GeminiKeyManager:
     async def ainvoke(self, input: str, chat_history) -> str:
         """Non-streaming call with key rotation on dead-key errors."""
         last_err: Optional[BaseException] = None
+        attempted_keys = set()
+
         while True:
             key = self._next_active_key()
-            if key is None:
+            if key is None or len(attempted_keys) >= len(self._keys):
+                logger.error("All Gemini API keys in the pool are dead. Last error: %s", last_err)
                 raise RuntimeError(
-                    "All Gemini API keys are exhausted (429)."
+                    "All Gemini API keys are exhausted, rate-limited, or invalid (429/403/443). Please check your API keys."
                 ) from last_err
+
+            attempted_keys.add(key)
             chain = self._build_chain(key)
             try:
                 return await chain.ainvoke({"input": input, "chat_history": chat_history})
             except Exception as e:
-                if _is_dead_key_error(e):
-                    self.mark_dead(key)
-                    last_err = e
-                    continue
-                raise
+                logger.warning("Gemini key '...%s' failed with error: %s. Rolling to next key.", key[-6:], e)
+                self.mark_dead(key)
+                last_err = e
 
     async def astream(self, input: str, chat_history) -> AsyncIterator[str]:
-        """Streaming call with key rotation. A 429 that occurs *before* the
-        first chunk is produced rolls to the next key. A 429 that occurs
-        mid-stream (after partial output) cannot be cleanly retried and is
-        re-raised."""
+        """Streaming call with key rotation on dead-key errors."""
         last_err: Optional[BaseException] = None
+        attempted_keys = set()
+
         while True:
             key = self._next_active_key()
-            if key is None:
+            if key is None or len(attempted_keys) >= len(self._keys):
+                logger.error("All Gemini API keys in the pool are dead. Last error: %s", last_err)
                 raise RuntimeError(
-                    "All Gemini API keys are exhausted (429)."
+                    "All Gemini API keys are exhausted, rate-limited, or invalid (429/403/443). Please check your API keys."
                 ) from last_err
+
+            attempted_keys.add(key)
             chain = self._build_chain(key)
             produced = False
             try:
@@ -128,10 +161,12 @@ class GeminiKeyManager:
                     yield chunk
                 return  # stream completed cleanly
             except Exception as e:
-                if _is_dead_key_error(e) and not produced:
+                logger.warning("Gemini streaming with key '...%s' failed with error: %s.", key[-6:], e)
+                if not produced:
                     self.mark_dead(key)
                     last_err = e
                     continue
+                # If chunks were already produced mid-stream, re-raise as we cannot cleanly restart mid-sentence
                 raise
 
 

@@ -47,11 +47,13 @@ class Settings(BaseSettings):
     @property
     def GEMINI_API_KEYS(self) -> List[str]:
         """Ordered list of usable Gemini keys: numbered keys first, then the
-        legacy single GEMINI_API_KEY as a fallback (deduplicated, blanks dropped)."""
-        keys = [getattr(self, f"GEMINI_API_KEY_{n}") for n in range(1, 6)]
+        single GEMINI_API_KEY (deduplicated, blanks dropped)."""
+        keys = [getattr(self, f"GEMINI_API_KEY_{n}", "") for n in range(1, 6)]
         keys = [k.strip() for k in keys if k and k.strip()]
-        if not keys and self.GEMINI_API_KEY and self.GEMINI_API_KEY != "your-gemini-api-key":
-            keys = [self.GEMINI_API_KEY.strip()]
+        if self.GEMINI_API_KEY and self.GEMINI_API_KEY != "your-gemini-api-key":
+            fallback = self.GEMINI_API_KEY.strip()
+            if fallback and fallback not in keys:
+                keys.append(fallback)
         return keys
 
 

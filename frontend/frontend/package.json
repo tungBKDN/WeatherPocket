@@ -7,10 +7,14 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "proto:gen": "npx grpc_tools_node_protoc --js_out=import_style=commonjs,binary:src/generated/proto --grpc-web_out=import_style=commonjs,mode=grpcwebtext:src/generated/proto -I../../backend/proto ../../backend/proto/weatherpocket.proto"
   },
   "dependencies": {
+    "@improbable-eng/grpc-web": "^0.15.0",
     "@tailwindcss/vite": "^4.2.1",
+    "google-protobuf": "^3.21.4",
+    "grpc-web": "^2.0.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-markdown": "^9.0.1",
@@ -26,6 +30,9 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
-    "vite": "^7.3.1"
+    "grpc-tools": "^1.13.1",
+    "protoc-gen-grpc-web": "^1.5.0",
+    "vite": "^7.3.1",
+    "vite-plugin-commonjs": "^0.10.4"
   }
 }

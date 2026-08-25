@@ -23,10 +23,12 @@ export default function App() {
   useEffect(() => {
     const bootstrap = async () => {
       const token = getSavedToken()
+      if (!token) {
+        setStatus('unauthenticated')
+        return
+      }
       try {
-        // Try with localStorage token first, then fall back to httpOnly cookie
         const userData = await getMe(token)
-        if (token === null) saveToken(userData.access_token ?? '')
         setUser(userData)
         setStatus('authenticated')
       } catch {

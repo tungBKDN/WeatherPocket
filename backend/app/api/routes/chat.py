@@ -77,6 +77,15 @@ async def send_message(
         elif "not found" in str(e):
             raise HTTPException(status_code=404, detail=str(e))
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        err_str = str(e)
+        if "503" in err_str or "UNAVAILABLE" in err_str or "high demand" in err_str:
+            raise HTTPException(
+                status_code=503,
+                detail="AI service is temporarily experiencing high demand. Please try again in a few moments."
+            )
+        raise HTTPException(status_code=500, detail=f"Failed to process message: {err_str}")
+
 
 @router.post("/")
 async def create_conversation(

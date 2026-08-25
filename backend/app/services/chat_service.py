@@ -21,7 +21,7 @@ class ChatService:
 
     def __init__(self):
         self.conversation_repo = ConversationRepository()
-        self.rag = RagService.get_instance()
+        self.rag: Optional[RagService] = None
 
     @classmethod
     def get_instance(cls) -> 'ChatService':
@@ -30,11 +30,16 @@ class ChatService:
             cls._instance = cls()
         return cls._instance
 
+    def _get_rag_service(self) -> RagService:
+        if self.rag is None:
+            self.rag = RagService.get_instance()
+        return self.rag
+
     def _retrieve_context(self, content: str, file_ids: Optional[List[str]]) -> str:
         """If file_ids provided, retrieve and format RAG context (ephemeral - not saved)."""
         if not file_ids:
             return ""
-        contexts = self.rag.retrieving(query=content, file_ids=file_ids)
+        contexts = self._get_rag_service().retrieving(query=content, file_ids=file_ids)
         return _build_rag_context(contexts) if contexts else ""
 
     async def send_message(
